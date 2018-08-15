@@ -1,0 +1,66 @@
+/*
+ * Copyright (c) 2018 Particle Industries, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation, either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "at_command_manager.h"
+#include <cstring>
+#include <cstdio>
+
+/* :( */
+extern "C" {
+#include "esp_at.h"
+}
+
+extern const char* FIRMWARE_VERSION;
+
+namespace particle { namespace ncp {
+
+int AtCommandManager::init() {
+    static esp_at_cmd_struct cgmr = {
+        (char*)"+CGMR",
+        nullptr,
+        nullptr,
+        nullptr,
+        [](uint8_t*) -> uint8_t {
+            esp_at_port_write_data((uint8_t*)FIRMWARE_VERSION, strlen(FIRMWARE_VERSION));
+            return ESP_AT_RESULT_CODE_OK;
+        }
+    };
+
+    CHECK_BOOL(esp_at_custom_cmd_array_regist(&cgmr, 1));
+
+    static esp_at_cmd_struct cmux = {
+        (char*)"+CMUX",
+        [](uint8_t*) -> uint8_t {
+            return ESP_AT_RESULT_CODE_ERROR;
+        },
+        [](uint8_t*) -> uint8_t {
+            return ESP_AT_RESULT_CODE_ERROR;
+        },
+        [](uint8_t) -> uint8_t {
+            return ESP_AT_RESULT_CODE_ERROR;
+        },
+        [](uint8_t*) -> uint8_t {
+            return ESP_AT_RESULT_CODE_ERROR;
+        }
+    };
+
+    CHECK_BOOL(esp_at_custom_cmd_array_regist(&cmux, 1));
+
+    return 0;
+}
+
+} } /* particle::ncp */

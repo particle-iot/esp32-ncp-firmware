@@ -21,6 +21,7 @@
 #include <freertos/task.h>
 #include "util.h"
 #include "at_transport_uart.h"
+#include "at_command_manager.h"
 
 /* :( */
 extern "C" {
@@ -78,6 +79,9 @@ int atInitialize() {
     CHECK_BOOL(esp_at_wifi_cmd_regist());
 
     CHECK(transport.postInit());
+
+    static AtCommandManager comMan;
+    CHECK(comMan.init());
 
     return 0;
 }
