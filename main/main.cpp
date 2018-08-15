@@ -16,9 +16,11 @@
  */
 
 #include <esp_system.h>
+#include <esp_wifi.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "util.h"
+#include "at_transport_uart.h"
 
 /* :( */
 extern "C" {
@@ -27,13 +29,44 @@ extern "C" {
 
 extern "C" void app_main(void);
 
-const char* FIRMWARE_VERSION = "v0.0.1";
+const char* FIRMWARE_VERSION = "0.0.1";
+
+const auto UART_CONF_INSTANCE = UART_NUM_2;
+const auto UART_CONF_TX_PIN = 17;
+const auto UART_CONF_RX_PIN = 16;
+const auto UART_CONF_RTS_PIN = 18;
+const auto UART_CONF_CTS_PIN = 19;
+const auto UART_CONF_BAUD_RATE = 921600;
+const auto UART_CONF_DATA_BITS = UART_DATA_8_BITS;
+const auto UART_CONF_PARITY = UART_PARITY_DISABLE;
+const auto UART_CONF_STOP_BITS = UART_STOP_BITS_1;
+const auto UART_CONF_FLOW_CONTROL = UART_HW_FLOWCTRL_DISABLE;
+/* magick number */
+const auto UART_CONF_RX_FLOW_CTRL_THRESH = 122;
 
 using namespace particle;
 using namespace particle::util;
+using namespace particle::ncp;
 
 int atInitialize() {
-    /* TODO: initialize transport */
+    /* UART transport configuration */
+    AtUartTransport::Config conf = {};
+    conf.uart = UART_CONF_INSTANCE;
+    conf.txPin = UART_CONF_TX_PIN;
+    conf.rxPin = UART_CONF_RX_PIN;
+    conf.rtsPin = UART_CONF_RTS_PIN;
+    conf.ctsPin = UART_CONF_CTS_PIN;
+
+    conf.config.baud_rate = UART_CONF_BAUD_RATE;
+    conf.config.data_bits = UART_CONF_DATA_BITS;
+    conf.config.parity = UART_CONF_PARITY;
+    conf.config.stop_bits = UART_CONF_STOP_BITS;
+    conf.config.flow_ctrl = UART_CONF_FLOW_CONTROL;
+    conf.config.rx_flow_ctrl_thresh = UART_CONF_RX_FLOW_CTRL_THRESH;
+
+    /* Initialize transport first */
+    static AtUartTransport transport(conf);
+    CHECK(transport.init());
 
     /* Initialize AT library */
     esp_at_module_init(CONFIG_LWIP_MAX_SOCKETS - 1, (const uint8_t*)FIRMWARE_VERSION);
@@ -44,8 +77,21 @@ int atInitialize() {
     /* WiFi AT commands */
     CHECK_BOOL(esp_at_wifi_cmd_regist());
 
-    /* TODO: custom AT commands */
-    /* esp_at_custom_cmd_array_regist() */
+    CHECK(transport.postInit());
+
+    return 0;
+}
+
+int miscInitialize() {
+    /* For some reason by default esp32-at configures wifi as STA + SoftAP.
+     * We don't want that for now, so we check the current mode and set it to STA only
+     * if needed.
+     */
+    wifi_mode_t mode;
+    CHECK_ESP(esp_wifi_get_mode(&mode));
+    if (mode != WIFI_MODE_STA) {
+        CHECK_ESP(esp_wifi_set_mode(WIFI_MODE_STA));
+    }
 
     return 0;
 }
