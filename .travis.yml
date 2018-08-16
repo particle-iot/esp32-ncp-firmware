@@ -9,6 +9,7 @@ addons:
       - gperf
       - python
       - python-serial
+      - libarchive-zip-perl
 
 before_install:
   # Save path to the git respository
