@@ -15,33 +15,36 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGON_NCP_FIRMWARE_AT_COMMAND_MANAGER_H
-#define ARGON_NCP_FIRMWARE_AT_COMMAND_MANAGER_H
+#ifndef ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H
+#define ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H
 
-#include "util.h"
 #include "at_transport.h"
-
-#include <esp_attr.h>
-/* :( */
-extern "C" {
-#include "esp_at.h"
-}
+#include "esp_ota_ops.h"
 
 namespace particle { namespace ncp {
 
-class AtCommandManager {
+class UpdateManager {
 public:
-    int init();
-
-    static AtCommandManager* instance() {
-        static AtCommandManager man;
+    static UpdateManager* instance() {
+        static UpdateManager man;
         return &man;
     }
 
+    int update(size_t size);
+
 protected:
-    AtCommandManager() = default;
+    UpdateManager();
+
+private:
+    void reset();
+
+private:
+    size_t imageSize_;
+    size_t currentSize_;
+    esp_ota_handle_t ota_;
+    int error_;
 };
 
 } } /* particle::ncp */
 
-#endif /* ARGON_NCP_FIRMWARE_AT_COMMAND_MANAGER_H */
+#endif /* ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H */

@@ -20,10 +20,13 @@
 namespace particle { namespace ncp {
 
 AtUartTransport::AtUartTransport(const Config& conf)
-        : AtTransportBase<AtUartTransport>(),
+        : AtTransportBase(),
           conf_(conf),
           exit_(false) {
 
+}
+
+AtUartTransport::~AtUartTransport() {
 }
 
 int AtUartTransport::initTransport()  {
@@ -85,7 +88,7 @@ int AtUartTransport::postInitTransport() {
     return 0;
 }
 
-int AtUartTransport::readData(uint8_t* data, ssize_t len) {
+int AtUartTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMsec) {
     if (!data || len < 0 || !started_) {
         return -1;
     }
@@ -94,7 +97,11 @@ int AtUartTransport::readData(uint8_t* data, ssize_t len) {
         return 0;
     }
 
-    return uart_read_bytes(conf_.uart, data, len, portTICK_RATE_MS);
+    return uart_read_bytes(conf_.uart, data, len, timeoutMsec * portTICK_PERIOD_MS);
+}
+
+int AtUartTransport::flushInput() {
+    return uart_flush_input(conf_.uart);
 }
 
 int AtUartTransport::writeData(const uint8_t* data, size_t len) {
@@ -152,7 +159,7 @@ void AtUartTransport::run() {
             switch (event.type) {
                 case UART_DATA:
                 case UART_BUFFER_FULL: {
-                    esp_at_port_recv_data_notify(event.size, portMAX_DELAY);
+                    notifyReceivedData(event.size, portMAX_DELAY);
                     break;
                 }
 

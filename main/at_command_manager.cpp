@@ -18,6 +18,8 @@
 #include "at_command_manager.h"
 #include <cstring>
 #include <cstdio>
+#include "update_manager.h"
+#include "freertos/FreeRTOS.h"
 
 /* :( */
 extern "C" {
@@ -59,6 +61,33 @@ int AtCommandManager::init() {
     };
 
     CHECK_BOOL(esp_at_custom_cmd_array_regist(&cmux, 1));
+
+    static esp_at_cmd_struct fwupd = {
+        (char*)"+FWUPD",
+        nullptr,
+        nullptr,
+        [](uint8_t) -> uint8_t {
+            int32_t sizeVal;
+            if (esp_at_get_para_as_digit(0, &sizeVal) == ESP_AT_PARA_PARSE_RESULT_OK && sizeVal > 0) {
+                auto transport = AtTransportBase::instance();
+                if (transport) {
+                    esp_at_response_result(ESP_AT_RESULT_CODE_OK);
+                    esp_at_port_wait_write_complete(portMAX_DELAY);
+
+                    transport->setDirectMode(true);
+                    int r = UpdateManager::instance()->update(sizeVal);
+                    transport->setDirectMode(false);
+                    if (r) {
+                        LOG(ERROR, "Update failed: %d", r);
+                    }
+                }
+            }
+            return ESP_AT_RESULT_CODE_ERROR;
+        },
+        nullptr
+    };
+
+    CHECK_BOOL(esp_at_custom_cmd_array_regist(&fwupd, 1));
 
     return 0;
 }

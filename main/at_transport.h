@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cassert>
+#include <atomic>
 #include <sys/types.h>
 #include "util.h"
 
@@ -31,36 +32,40 @@ extern "C" {
 
 namespace particle { namespace ncp {
 
-template <typename DerivedT>
 class AtTransportBase {
 public:
+    virtual ~AtTransportBase();
+
     int init();
     int destroy();
     int postInit();
 
-    static DerivedT* instance();
+    void setDirectMode(bool direct);
+    bool isDirectMode() const;
+
+    static AtTransportBase* instance();
+
+    virtual int readData(uint8_t* data, ssize_t len, unsigned int timeoutMsec = 1) = 0;
+    virtual int flushInput() = 0;
+    virtual int writeData(const uint8_t* data, size_t len) = 0;
+    virtual int getDataLength() const = 0;
+    virtual int waitWriteComplete(unsigned int timeoutMsec) = 0;
 
 protected:
-    /* Overridable */
-    int initTransport();
-    int destroyTransport();
-    int postInitTransport();
+    virtual int initTransport() = 0;
+    virtual int destroyTransport() = 0;
+    virtual int postInitTransport() = 0;
 
-    int readData(uint8_t* data, ssize_t len);
-    int writeData(const uint8_t* data, size_t len);
-    int getDataLength() const;
-    int waitWriteComplete(unsigned int timeoutMsec);
+    virtual int statusChanged(esp_at_status_type status) = 0;
+    virtual int preDeepSleep() = 0;
+    virtual int preRestart() = 0;
 
-    int statusChanged(esp_at_status_type status);
-    int preDeepSleep();
-    int preRestart();
+    int notifyReceivedData(size_t len, unsigned int timeoutMsec);
 
 protected:
     AtTransportBase();
 
 private:
-    DerivedT& derived();
-
     /* esp32-at device ops callbacks */
     static int32_t espAtReadData(uint8_t* data, int32_t len);
     static int32_t espAtWriteData(uint8_t* data, int32_t len);
@@ -73,111 +78,9 @@ private:
     static void espAtPreRestartCallback();
 
 private:
-    static DerivedT* instance_;
+    std::atomic_bool direct_;
+    static AtTransportBase* instance_;
 };
-
-/* Implementation */
-
-template <typename DerivedT>
-DerivedT* AtTransportBase<DerivedT>::instance_ = nullptr;
-
-template <typename DerivedT>
-inline AtTransportBase<DerivedT>::AtTransportBase() {
-    assert(instance_ == nullptr);
-    instance_ = &derived();
-}
-
-template <typename DerivedT>
-inline int AtTransportBase<DerivedT>::init() {
-    CHECK(derived().initTransport());
-
-    esp_at_device_ops_struct deviceOps = {
-        .read_data = espAtReadData,
-        .write_data = espAtWriteData,
-        .get_data_length = espAtGetDataLength,
-        .wait_write_complete = espAtWaitWriteComplete,
-    };
-
-    esp_at_custom_ops_struct customOps = {
-        .status_callback = espAtStatusCallback,
-        .pre_deepsleep_callback = espAtPreDeepSleepCallback,
-        .pre_restart_callback = espAtPreRestartCallback,
-    };
-
-    esp_at_device_ops_regist(&deviceOps);
-    esp_at_custom_ops_regist(&customOps);
-
-    return 0;
-}
-
-template <typename DerivedT>
-inline int AtTransportBase<DerivedT>::destroy() {
-    CHECK(derived().destroyTransport());
-
-    /* Does this work? */
-    esp_at_device_ops_regist(nullptr);
-    esp_at_custom_ops_regist(nullptr);
-
-    return 0;
-}
-
-template <typename DerivedT>
-inline int AtTransportBase<DerivedT>::postInit() {
-    return derived().postInitTransport();
-}
-
-template <typename DerivedT>
-inline DerivedT* AtTransportBase<DerivedT>::instance() {
-    assert(instance_ != nullptr);
-    return instance_;
-}
-
-template <typename DerivedT>
-inline DerivedT& AtTransportBase<DerivedT>::derived() {
-    return *static_cast<DerivedT*>(this);
-}
-
-template <typename DerivedT>
-inline int32_t AtTransportBase<DerivedT>::espAtReadData(uint8_t* data, int32_t len) {
-    auto self = instance();
-    return self->readData(data, len);
-}
-
-template <typename DerivedT>
-inline int32_t AtTransportBase<DerivedT>::espAtWriteData(uint8_t* data, int32_t len) {
-    auto self = instance();
-    return self->writeData(data, len);
-}
-
-template <typename DerivedT>
-inline int32_t AtTransportBase<DerivedT>::espAtGetDataLength() {
-    const auto self = instance();
-    return self->getDataLength();
-}
-
-template <typename DerivedT>
-inline bool AtTransportBase<DerivedT>::espAtWaitWriteComplete(int32_t timeoutMsec) {
-    auto self = instance();
-    return self->waitWriteComplete(timeoutMsec) == 0;
-}
-
-template <typename DerivedT>
-inline void AtTransportBase<DerivedT>::espAtStatusCallback(esp_at_status_type status) {
-    auto self = instance();
-    self->statusChanged(status);
-}
-
-template <typename DerivedT>
-inline void AtTransportBase<DerivedT>::espAtPreDeepSleepCallback() {
-    auto self = instance();
-    self->preDeepSleep();
-}
-
-template <typename DerivedT>
-inline void AtTransportBase<DerivedT>::espAtPreRestartCallback() {
-    auto self = instance();
-    self->preRestart();
-}
 
 } } /* particle::ncp */
 

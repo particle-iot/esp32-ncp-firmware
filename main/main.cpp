@@ -30,7 +30,7 @@ extern "C" {
 
 extern "C" void app_main(void);
 
-const char* FIRMWARE_VERSION = "0.0.1";
+const char* FIRMWARE_VERSION = "0.0.2";
 
 const auto UART_CONF_INSTANCE = UART_NUM_2;
 const auto UART_CONF_TX_PIN = 17;
@@ -69,6 +69,8 @@ int atInitialize() {
     static AtUartTransport transport(conf);
     CHECK(transport.init());
 
+    CHECK(AtCommandManager::instance()->init());
+
     /* Initialize AT library */
     esp_at_module_init(CONFIG_LWIP_MAX_SOCKETS - 1, (const uint8_t*)FIRMWARE_VERSION);
 
@@ -79,9 +81,6 @@ int atInitialize() {
     CHECK_BOOL(esp_at_wifi_cmd_regist());
 
     CHECK(transport.postInit());
-
-    static AtCommandManager comMan;
-    CHECK(comMan.init());
 
     return 0;
 }
