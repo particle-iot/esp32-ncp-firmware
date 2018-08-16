@@ -2,6 +2,18 @@
 
 The firmware for Argon NCP (ESP32).
 
+## Prerequisites
+
+- Ensure the xtensa-esp32 toolchain is in your PATH. It can be downloaded from [http://domoticx.com/sdk-esp32-xtensa-architecture-toolchain/](http://domoticx.com/sdk-esp32-xtensa-architecture-toolchain/)
+
+## After pulling from the repo
+
+After pulling changes from the repo, run 
+
+```
+git submodule update --init --recursive
+```
+
 ## Building and flashing the application
 
 ```
