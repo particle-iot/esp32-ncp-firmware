@@ -37,6 +37,7 @@ script:
   - make defconfig
   # Build project from the git repository
   - make
+  - make module
 
 notifications:
   slack: s:uyDgDeY2Sric20NcE50P11QS
