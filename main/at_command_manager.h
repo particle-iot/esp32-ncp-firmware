@@ -27,6 +27,8 @@ extern "C" {
 #include "esp_at.h"
 }
 
+#include "driver/gpio.h"
+
 namespace particle { namespace ncp {
 
 class AtCommandManager {
@@ -38,8 +40,13 @@ public:
         return &man;
     }
 
+    int writeString(const char* data);
+
 protected:
     AtCommandManager() = default;
+
+private:
+    gpio_config_t gpioConfiguration_[GPIO_NUM_MAX] = {};
 };
 
 } } /* particle::ncp */
