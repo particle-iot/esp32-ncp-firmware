@@ -14,3 +14,5 @@ include $(IDF_PATH)/make/project.mk
 include moduleinfo.mk
 
 CXXFLAGS += -std=c++14 -Wall -Werror
+
+include factory.mk
