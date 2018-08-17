@@ -11,5 +11,6 @@ EXTRA_COMPONENT_DIRS := $(THIRD_PARTY_DIR)/esp32-at/components
 export IDF_PATH ?= $(ESP_AT_PROJECT_PATH)/esp-idf
 
 include $(IDF_PATH)/make/project.mk
+include moduleinfo.mk
 
 CXXFLAGS += -std=c++14 -Wall -Werror
