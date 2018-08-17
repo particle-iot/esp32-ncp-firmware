@@ -200,7 +200,7 @@ int AtCommandManager::init() {
             (char*)"+GPIOC",
             [](uint8_t*) -> uint8_t { /* AT+GPIOC=? handler */
                 static const char response[] = "+GPIOC: (0-39),(0-3),(0-2),(0-1)";
-                /* +GPIOC: <pin>,<gpio_mode>,[<gpio_pull>],[<gpio_default>]
+                /* +GPIOC=<pin>,<gpio_mode>,[<gpio_pull>],[<gpio_default>]
                  * <pin>: 0-39
                  * <gpio_mode>: 0 - DISABLE, INPUT, OUTPUT, OUTPUT_OD
                  * <gpio_pull>: 0 - none, 1 - pull-down, 2 - pull-up
@@ -292,7 +292,7 @@ int AtCommandManager::init() {
             (char*)"+GPIOR",
             [](uint8_t*) -> uint8_t { /* AT+GPIOR=? handler */
                 static const char response[] = "+GPIOR: (0-39)";
-                /* +GPIOR: <pin>
+                /* +GPIOR=<pin>
                  * <pin>: 0-39
                  */
                 auto self = AtCommandManager::instance();
@@ -320,9 +320,10 @@ int AtCommandManager::init() {
         {
             (char*)"+GPIOW",
             [](uint8_t*) -> uint8_t { /* AT+GPIOW=? handler */
-                static const char response[] = "+GPIOW: (0-33)";
-                /* +GPIOW: <pin>
+                static const char response[] = "+GPIOW: (0-33),(0-1)";
+                /* +GPIOW=<pin>,<level>
                  * <pin>: 0-33
+                 * <level>: 0 - low, 1 - high
                  */
                 auto self = AtCommandManager::instance();
                 self->writeString(response);
