@@ -18,8 +18,7 @@
 #ifndef ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H
 #define ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H
 
-#include "at_transport.h"
-#include "esp_ota_ops.h"
+#include "common.h"
 
 namespace particle { namespace ncp {
 
@@ -34,15 +33,6 @@ public:
 
 protected:
     UpdateManager();
-
-private:
-    void reset();
-
-private:
-    size_t imageSize_;
-    size_t currentSize_;
-    esp_ota_handle_t ota_;
-    int error_;
 };
 
 } } /* particle::ncp */
