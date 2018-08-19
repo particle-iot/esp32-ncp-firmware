@@ -15,17 +15,12 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGON_NCP_FIRMWARE_UTIL_H
-#define ARGON_NCP_FIRMWARE_UTIL_H
+#pragma once
 
-#include "common.h"
+#include "result.h"
+#include "logging.h"
 
-namespace particle { namespace util {
-
-uint64_t millis();
-
-int nvsInitialize();
-
-} } /* particle::util */
-
-#endif /* ARGON_NCP_FIRMWARE_UTIL_H */
+#include <memory>
+#include <cstring>
+#include <cstdint>
+#include <cassert>

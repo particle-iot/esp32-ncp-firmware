@@ -19,6 +19,7 @@
 #include <esp_wifi.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "common.h"
 #include "util.h"
 #include "at_transport_uart.h"
 #include "at_command_manager.h"
@@ -76,9 +77,9 @@ int atInitialize() {
 
     /* Initialize command sets */
     /* Base AT commands */
-    CHECK_BOOL(esp_at_base_cmd_regist());
+    CHECK_TRUE(esp_at_base_cmd_regist(), RESULT_ERROR);
     /* WiFi AT commands */
-    CHECK_BOOL(esp_at_wifi_cmd_regist());
+    CHECK_TRUE(esp_at_wifi_cmd_regist(), RESULT_ERROR);
 
     CHECK(transport.postInit());
 

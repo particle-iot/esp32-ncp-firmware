@@ -15,17 +15,29 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGON_NCP_FIRMWARE_UTIL_H
-#define ARGON_NCP_FIRMWARE_UTIL_H
+#pragma once
 
-#include "common.h"
+#include <esp_log.h>
 
-namespace particle { namespace util {
+#define LOG_TAG "ncp" // FIXME
 
-uint64_t millis();
+#define LOG(_level, _fmt, ...) \
+        ESP_LOG_LEVEL_LOCAL((esp_log_level_t)::particle::LOG_LEVEL_##_level, LOG_TAG, _fmt, ##__VA_ARGS__)
 
-int nvsInitialize();
+#ifndef NDEBUG
+#define LOG_DEBUG(_level, _fmt, ...) \
+        LOG(_level, _fmt, ##__VA_ARGS__)
+#else
+#define LOG_DEBUG(_level, _fmt, ...)
+#endif
 
-} } /* particle::util */
+namespace particle {
 
-#endif /* ARGON_NCP_FIRMWARE_UTIL_H */
+enum LogLevel {
+    LOG_LEVEL_TRACE = ESP_LOG_DEBUG,
+    LOG_LEVEL_INFO = ESP_LOG_INFO,
+    LOG_LEVEL_WARN = ESP_LOG_WARN,
+    LOG_LEVEL_ERROR = ESP_LOG_ERROR
+};
+
+} // particle

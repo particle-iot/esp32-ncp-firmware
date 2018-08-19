@@ -42,7 +42,7 @@ int AtCommandManager::init() {
         }
     };
 
-    CHECK_BOOL(esp_at_custom_cmd_array_regist(&cgmr, 1));
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(&cgmr, 1), RESULT_ERROR);
 
     static esp_at_cmd_struct cmux = {
         (char*)"+CMUX",
@@ -60,7 +60,7 @@ int AtCommandManager::init() {
         }
     };
 
-    CHECK_BOOL(esp_at_custom_cmd_array_regist(&cmux, 1));
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(&cmux, 1), RESULT_ERROR);
 
     static esp_at_cmd_struct fwupd = {
         (char*)"+FWUPD",
@@ -87,7 +87,7 @@ int AtCommandManager::init() {
         nullptr
     };
 
-    CHECK_BOOL(esp_at_custom_cmd_array_regist(&fwupd, 1));
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(&fwupd, 1), RESULT_ERROR);
 
     return 0;
 }
