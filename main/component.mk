@@ -7,4 +7,4 @@
 # please read the ESP-IDF documents if you need to do this.
 #
 
-COMPONENT_SRCDIRS += xmodem-1k
+COMPONENT_SRCDIRS +=
