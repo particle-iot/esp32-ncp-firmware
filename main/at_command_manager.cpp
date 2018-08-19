@@ -337,7 +337,7 @@ int AtCommandManager::init() {
                 }
 
                 int32_t val;
-                if (esp_at_get_para_as_digit(3, &val) != ESP_AT_PARA_PARSE_RESULT_OK ||
+                if (esp_at_get_para_as_digit(1, &val) != ESP_AT_PARA_PARSE_RESULT_OK ||
                     (val != 0 && val != 1)) {
                     return ESP_AT_RESULT_CODE_ERROR;
                 }
