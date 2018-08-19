@@ -24,12 +24,18 @@
 #define LOG(_level, _fmt, ...) \
         ESP_LOG_LEVEL_LOCAL((esp_log_level_t)::particle::LOG_LEVEL_##_level, LOG_TAG, _fmt, ##__VA_ARGS__)
 
-#ifndef NDEBUG
+#define LOG_DUMP(_level, _data, _size) \
+        ESP_LOG_BUFFER_HEXDUMP(LOG_TAG, _data, _size, (esp_log_level_t)::particle::LOG_LEVEL_##_level)
+
+//#ifndef NDEBUG
 #define LOG_DEBUG(_level, _fmt, ...) \
         LOG(_level, _fmt, ##__VA_ARGS__)
-#else
-#define LOG_DEBUG(_level, _fmt, ...)
-#endif
+#define LOG_DUMP_DEBUG(_level, _data, _size) \
+        LOG_DUMP(_level, _data, _size)
+//#else
+//#define LOG_DEBUG(_level, _fmt, ...)
+//#define LOG_DUMP_DEBUG(_level, _data, _size)
+//#endif
 
 namespace particle {
 

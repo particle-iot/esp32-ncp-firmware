@@ -100,6 +100,7 @@ int XmodemReceiver::init(Stream* src, OutputStream* dest, size_t size) {
     destStrm_ = dest;
     fileSize_ = size;
     fileOffs_ = 0;
+    chunkSize_ = 0;
     packetSize_ = 0;
     packetOffs_ = 0;
     packetNum_ = 0;
@@ -126,8 +127,12 @@ int XmodemReceiver::run() {
         ret = recvSoh();
         break;
     }
-    case State::RECV_PACKET: {
-        ret = recvPacket();
+    case State::RECV_PACKET_HEADER: {
+        ret = recvPacketHeader();
+        break;
+    }
+    case State::RECV_PACKET_DATA: {
+        ret = recvPacketData();
         break;
     }
     case State::SEND_PACKET_ACK: {
@@ -180,11 +185,8 @@ int XmodemReceiver::recvSoh() {
         } else {
             canCount_ = 0;
             if (c == Ctrl::EOT) {
-                int ret = 0;
-                if (packetNum_ > 1) {
-                    // Write the last received packet to the destination stream
-                    ret = flush();
-                }
+                // Write the last received chunk to the destination stream
+                const int ret = flush();
                 if (ret < 0) {
                     setError(ret);
                 } else if (fileOffs_ < fileSize_) {
@@ -203,7 +205,7 @@ int XmodemReceiver::recvSoh() {
                 buf_[0] = c;
                 packetOffs_ = 1;
                 packetSize_ = ((c == Ctrl::SOH) ? 128 : 1024) + sizeof(PacketHeader) + sizeof(PacketCrc);
-                state_ = State::RECV_PACKET;
+                state_ = State::RECV_PACKET_HEADER;
                 // Except for the first packet, keep tracking the packet timeout starting from when
                 // the SOH byte was expected
                 if (packetNum_ == 0) {
@@ -228,13 +230,13 @@ int XmodemReceiver::recvSoh() {
     return Status::RUNNING;
 }
 
-int XmodemReceiver::recvPacket() {
-    const size_t n = CHECK(srcStrm_->read(buf_.get() + packetOffs_, packetSize_ - packetOffs_));
-    if (packetOffs_ < sizeof(PacketHeader) && packetOffs_ + n >= sizeof(PacketHeader)) {
+int XmodemReceiver::recvPacketHeader() {
+    packetOffs_ += CHECK(srcStrm_->read(buf_.get() + packetOffs_, sizeof(PacketHeader) - packetOffs_));
+    if (packetOffs_ == sizeof(PacketHeader)) {
         // Parse packet header
         PacketHeader h = {};
         memcpy(&h, buf_.get(), sizeof(PacketHeader));
-        if (h.num != ~h.numComp) {
+        if (h.num != 255 - h.numComp) {
             LOG(ERROR, "Malformed packet header");
             setError(RESULT_PROTOCOL_ERROR);
         } else if (packetNum_ > 1 && h.num == ((packetNum_ - 1) & 0xff)) {
@@ -243,44 +245,53 @@ int XmodemReceiver::recvPacket() {
                 setError(RESULT_LIMIT_EXCEEDED);
             } else {
                 --packetNum_; // Receiving duplicate packet
+                setState(State::RECV_PACKET_DATA);
             }
-        } else if (h.num != packetNum_) {
+        } else if (h.num != (packetNum_ & 0xff)) {
             LOG(ERROR, "Unexpected packet number: %u", (unsigned)h.num);
             setError(RESULT_PROTOCOL_ERROR);
-        } else if (packetNum_ > 1) {
-            // Write the last received packet to the destination stream
+        } else {
+            // Write the last received chunk to the destination stream
             const int ret = flush();
             if (ret < 0) {
                 setError(ret);
             } else {
                 retryCount_ = 0;
+                setState(State::RECV_PACKET_DATA);
             }
         }
+        if (lastError_ == 0) {
+            chunkSize_ = std::min(fileSize_ - fileOffs_, packetSize_ - sizeof(PacketHeader) - sizeof(PacketCrc));
+        }
+    } else {
+        CHECK(checkTimeout(PACKET_TIMEOUT));
     }
-    if (lastError_ == 0) {
-        packetOffs_ += n;
-        if (packetOffs_ == packetSize_) {
-            LOG_DEBUG(TRACE, "Received packet; number: %u, size: %u", packetNum_, (unsigned)packetSize_);
-            // Verify packet checksum
-            PacketCrc c = {};
-            memcpy(&c, buf_.get() + packetSize_ - sizeof(PacketCrc), sizeof(PacketCrc));
-            const uint16_t crc = (c.msb << 8) & c.lsb; // Received CRC-16
-            const uint16_t compCrc = calcCrc16(buf_.get() + sizeof(PacketHeader), packetSize_ - sizeof(PacketHeader) -
-                    sizeof(PacketCrc)); // Computed CRC-16
-            if (compCrc == crc) {
-                setState(State::SEND_PACKET_ACK);
-            } else {
-                LOG(WARN, "Invalid checksum");
-                if (++retryCount_ > MAX_PACKET_RETRY_COUNT) {
-                    LOG(ERROR, "Maximum number of retransmissions exceeded");
-                    setError(RESULT_LIMIT_EXCEEDED);
-                } else {
-                    setState(State::SEND_PACKET_NAK);
-                }
-            }
+    return Status::RUNNING;
+}
+
+int XmodemReceiver::recvPacketData() {
+    packetOffs_ += CHECK(srcStrm_->read(buf_.get() + packetOffs_, packetSize_ - packetOffs_));
+    if (packetOffs_ == packetSize_) {
+        LOG_DEBUG(TRACE, "Received packet; number: %u, size: %u", packetNum_, (unsigned)packetSize_);
+        // Verify packet checksum
+        PacketCrc c = {};
+        memcpy(&c, buf_.get() + packetSize_ - sizeof(PacketCrc), sizeof(PacketCrc));
+        const uint16_t crc = (c.msb << 8) | c.lsb; // Received CRC-16
+        const uint16_t compCrc = calcCrc16(buf_.get() + sizeof(PacketHeader), packetSize_ - sizeof(PacketHeader) -
+                sizeof(PacketCrc)); // Computed CRC-16
+        if (compCrc == crc) {
+            setState(State::SEND_PACKET_ACK);
         } else {
-            CHECK(checkTimeout(PACKET_TIMEOUT));
+            LOG(WARN, "Invalid checksum");
+            if (++retryCount_ > MAX_PACKET_RETRY_COUNT) {
+                LOG(ERROR, "Maximum number of retransmissions exceeded");
+                setError(RESULT_LIMIT_EXCEEDED);
+            } else {
+                setState(State::SEND_PACKET_NAK);
+            }
         }
+    } else {
+        CHECK(checkTimeout(PACKET_TIMEOUT));
     }
     return Status::RUNNING;
 }
@@ -328,7 +339,7 @@ int XmodemReceiver::sendCan() {
     }
     packetOffs_ += CHECK(srcStrm_->write(buf_.get(), packetSize_ - packetOffs_));
     if (packetOffs_ == packetSize_) {
-        LOG_DEBUG(TRACE, "Sent %u CAN byte(s)", (unsigned)packetSize_);
+        LOG_DEBUG(TRACE, "Sent CAN (%u bytes)", (unsigned)packetSize_);
         return lastError_;
     }
     CHECK(checkTimeout(SEND_TIMEOUT));
@@ -336,13 +347,11 @@ int XmodemReceiver::sendCan() {
 }
 
 int XmodemReceiver::flush() {
-    size_t n = 0;
-    if (fileOffs_ < fileSize_) {
-        assert(packetSize_ != 0);
-        n = std::min(fileSize_ - fileOffs_, packetSize_ - sizeof(PacketHeader) - sizeof(PacketCrc));
-        fileOffs_ += CHECK(destStrm_->write(buf_.get() + sizeof(PacketHeader), n));
+    if (chunkSize_ > 0) {
+        fileOffs_ += CHECK(destStrm_->write(buf_.get() + sizeof(PacketHeader), chunkSize_));
+        chunkSize_ = 0;
     }
-    return n;
+    return 0;
 }
 
 int XmodemReceiver::checkTimeout(unsigned timeout) {

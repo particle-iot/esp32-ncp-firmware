@@ -48,7 +48,8 @@ private:
         NEW, // Uninitialized
         SEND_NCG, // Sending NCGbyte
         RECV_SOH, // Receiving "start of header" byte
-        RECV_PACKET, // Receiving remaining packet data
+        RECV_PACKET_HEADER, // Receiving packet header
+        RECV_PACKET_DATA, // Receiving remaining packet data
         SEND_PACKET_ACK, // Sending packet acknowledgement
         SEND_PACKET_NAK, // Sending negative packet acknowledgement
         SEND_EOT_ACK, // Sending "end of transmission" acknowledgement
@@ -66,6 +67,7 @@ private:
     size_t fileSize_; // File size
     size_t fileOffs_; // Current offset in the file
 
+    size_t chunkSize_; // Size of the current data chunk
     size_t packetSize_; // Size of the current XMODEM packet
     size_t packetOffs_; // Number of received bytes of the current packet
     unsigned packetNum_; // Packet number
@@ -74,7 +76,8 @@ private:
 
     int sendNcg();
     int recvSoh();
-    int recvPacket();
+    int recvPacketHeader();
+    int recvPacketData();
     int sendPacketAck();
     int sendPacketNak();
     int sendEotAck();
