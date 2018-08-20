@@ -67,7 +67,6 @@ private:
     size_t fileSize_; // File size
     size_t fileOffs_; // Current offset in the file
 
-    size_t chunkSize_; // Size of the current data chunk
     size_t packetSize_; // Size of the current XMODEM packet
     size_t packetOffs_; // Number of received bytes of the current packet
     unsigned packetNum_; // Packet number

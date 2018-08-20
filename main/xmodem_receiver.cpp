@@ -100,7 +100,6 @@ int XmodemReceiver::init(Stream* src, OutputStream* dest, size_t size) {
     destStrm_ = dest;
     fileSize_ = size;
     fileOffs_ = 0;
-    chunkSize_ = 0;
     packetSize_ = 0;
     packetOffs_ = 0;
     packetNum_ = 0;
@@ -178,7 +177,7 @@ int XmodemReceiver::recvSoh() {
     const size_t n = CHECK(srcStrm_->read(&c, 1));
     if (n > 0) {
         if (c == Ctrl::CAN) {
-            if (++canCount_ >= RECV_CAN_COUNT) {
+            if (++canCount_ == RECV_CAN_COUNT) {
                 LOG(WARN, "Sender has cancelled the transfer");
                 setError(RESULT_CANCELLED);
             }
@@ -204,15 +203,7 @@ int XmodemReceiver::recvSoh() {
             } else {
                 buf_[0] = c;
                 packetOffs_ = 1;
-                packetSize_ = ((c == Ctrl::SOH) ? 128 : 1024) + sizeof(PacketHeader) + sizeof(PacketCrc);
-                state_ = State::RECV_PACKET_HEADER;
-                // Except for the first packet, keep tracking the packet timeout starting from when
-                // the SOH byte was expected
-                if (packetNum_ == 0) {
-                    packetNum_ = 1;
-                    retryCount_ = 0;
-                    stateTime_ = util::millis();
-                }
+                state_ = State::RECV_PACKET_HEADER; // Do not restart the timer
             }
         }
     } else if (packetNum_ != 0) {
@@ -236,18 +227,20 @@ int XmodemReceiver::recvPacketHeader() {
         // Parse packet header
         PacketHeader h = {};
         memcpy(&h, buf_.get(), sizeof(PacketHeader));
-        if (h.num != 255 - h.numComp) {
+        const size_t size = ((h.start == Ctrl::SOH) ? 128 : 1024) + sizeof(PacketHeader) + sizeof(PacketCrc);
+        if (h.num + h.numComp != 255) {
             LOG(ERROR, "Malformed packet header");
             setError(RESULT_PROTOCOL_ERROR);
-        } else if (packetNum_ > 1 && h.num == ((packetNum_ - 1) & 0xff)) {
+        } else if (packetNum_ != 0 && h.num == (packetNum_ & 0xff)) {
             if (++retryCount_ > MAX_PACKET_RETRY_COUNT) {
                 LOG(ERROR, "Maximum number of retransmissions exceeded");
                 setError(RESULT_LIMIT_EXCEEDED);
             } else {
-                --packetNum_; // Receiving duplicate packet
-                setState(State::RECV_PACKET_DATA);
+                // Receiving a duplicate packet
+                packetSize_ = size;
+                state_ = State::RECV_PACKET_DATA; // Do not restart the timer
             }
-        } else if (h.num != (packetNum_ & 0xff)) {
+        } else if (h.num != ((packetNum_ + 1) & 0xff)) {
             LOG(ERROR, "Unexpected packet number: %u", (unsigned)h.num);
             setError(RESULT_PROTOCOL_ERROR);
         } else {
@@ -256,12 +249,11 @@ int XmodemReceiver::recvPacketHeader() {
             if (ret < 0) {
                 setError(ret);
             } else {
+                ++packetNum_;
                 retryCount_ = 0;
-                setState(State::RECV_PACKET_DATA);
+                packetSize_ = size;
+                state_ = State::RECV_PACKET_DATA;
             }
-        }
-        if (lastError_ == 0) {
-            chunkSize_ = std::min(fileSize_ - fileOffs_, packetSize_ - sizeof(PacketHeader) - sizeof(PacketCrc));
         }
     } else {
         CHECK(checkTimeout(PACKET_TIMEOUT));
@@ -283,11 +275,12 @@ int XmodemReceiver::recvPacketData() {
             setState(State::SEND_PACKET_ACK);
         } else {
             LOG(WARN, "Invalid checksum");
-            if (++retryCount_ > MAX_PACKET_RETRY_COUNT) {
+            if (retryCount_ < MAX_PACKET_RETRY_COUNT) {
+                setState(State::SEND_PACKET_NAK);
+            } else {
+                // Do not send NAK if we can't accept a retransmission anyway
                 LOG(ERROR, "Maximum number of retransmissions exceeded");
                 setError(RESULT_LIMIT_EXCEEDED);
-            } else {
-                setState(State::SEND_PACKET_NAK);
             }
         }
     } else {
@@ -301,7 +294,6 @@ int XmodemReceiver::sendPacketAck() {
     const size_t n = CHECK(srcStrm_->write(&c, 1));
     if (n > 0) {
         LOG_DEBUG(TRACE, "Sent ACK");
-        ++packetNum_;
         setState(State::RECV_SOH);
     } else {
         CHECK(checkTimeout(SEND_TIMEOUT));
@@ -347,11 +339,13 @@ int XmodemReceiver::sendCan() {
 }
 
 int XmodemReceiver::flush() {
-    if (chunkSize_ > 0) {
-        fileOffs_ += CHECK(destStrm_->write(buf_.get() + sizeof(PacketHeader), chunkSize_));
-        chunkSize_ = 0;
+    size_t n = 0;
+    if (packetSize_ > 0) {
+        n = std::min(fileSize_ - fileOffs_, packetSize_ - sizeof(PacketHeader) - sizeof(PacketCrc));
+        fileOffs_ += CHECK(destStrm_->write(buf_.get() + sizeof(PacketHeader), n));
+        packetSize_ = 0;
     }
-    return 0;
+    return n;
 }
 
 int XmodemReceiver::checkTimeout(unsigned timeout) {
