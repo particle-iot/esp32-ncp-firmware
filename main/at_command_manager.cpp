@@ -306,11 +306,19 @@ int AtCommandManager::init() {
                     return ESP_AT_RESULT_CODE_ERROR;
                 }
 
+                auto self = AtCommandManager::instance();
+                const auto& conf = self->gpioConfiguration_[pin];
+                if (conf.mode == GPIO_MODE_DISABLE || conf.mode == GPIO_MODE_OUTPUT ||
+                    conf.mode == GPIO_MODE_OUTPUT_OD) {
+                    /* Invalid mode */
+                    return ESP_AT_RESULT_CODE_ERROR;
+                }
+
+
                 int level = gpio_get_level((gpio_num_t)pin);
 
                 char buf[8] = {};
                 snprintf(buf, sizeof(buf), "%d", level);
-                auto self = AtCommandManager::instance();
                 self->writeString(buf);
 
                 return ESP_AT_RESULT_CODE_OK;
@@ -339,6 +347,13 @@ int AtCommandManager::init() {
                 int32_t val;
                 if (esp_at_get_para_as_digit(1, &val) != ESP_AT_PARA_PARSE_RESULT_OK ||
                     (val != 0 && val != 1)) {
+                    return ESP_AT_RESULT_CODE_ERROR;
+                }
+
+                auto self = AtCommandManager::instance();
+                const auto& conf = self->gpioConfiguration_[pin];
+                if (conf.mode == GPIO_MODE_DISABLE || conf.mode == GPIO_MODE_INPUT) {
+                    /* Invalid mode */
                     return ESP_AT_RESULT_CODE_ERROR;
                 }
 
