@@ -21,6 +21,14 @@ $ make
 $ make flash
 ```
 
+## Building the factory image
+
+```
+$ make factory_bin
+```
+
+The combined 4MB factory binary will be written to `build/factory.bin`.
+
 ## Updating the firmware using XModem
 
 By default, the firmware runs an AT command interface on UART2 (TX: GPIO17, RX: GPIO16, HW flow control disabled).
