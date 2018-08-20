@@ -308,8 +308,7 @@ int AtCommandManager::init() {
 
                 auto self = AtCommandManager::instance();
                 const auto& conf = self->gpioConfiguration_[pin];
-                if (conf.mode == GPIO_MODE_DISABLE || conf.mode == GPIO_MODE_OUTPUT ||
-                    conf.mode == GPIO_MODE_OUTPUT_OD) {
+                if (!conf.pin_bit_mask || conf.mode == GPIO_MODE_DISABLE) {
                     /* Invalid mode */
                     return ESP_AT_RESULT_CODE_ERROR;
                 }
@@ -352,7 +351,7 @@ int AtCommandManager::init() {
 
                 auto self = AtCommandManager::instance();
                 const auto& conf = self->gpioConfiguration_[pin];
-                if (conf.mode == GPIO_MODE_DISABLE || conf.mode == GPIO_MODE_INPUT) {
+                if (!conf.pin_bit_mask || conf.mode == GPIO_MODE_DISABLE || conf.mode == GPIO_MODE_INPUT) {
                     /* Invalid mode */
                     return ESP_AT_RESULT_CODE_ERROR;
                 }
