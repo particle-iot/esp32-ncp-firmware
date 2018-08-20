@@ -203,14 +203,11 @@ int XmodemReceiver::recvSoh() {
             } else {
                 buf_[0] = c;
                 packetOffs_ = 1;
-                state_ = State::RECV_PACKET_HEADER; // Do not restart the timer
+                setState(State::RECV_PACKET_HEADER, false);
             }
         }
     } else if (packetNum_ != 0) {
-        if (checkTimeout(RECV_TIMEOUT) != 0) {
-            LOG(ERROR, "Sender timeout");
-            setError(RESULT_TIMEOUT);
-        }
+        checkPacketTimeout();
     } else if (checkTimeout(NCG_INTERVAL) != 0) {
         if (++retryCount_ > MAX_NCG_RETRY_COUNT) {
             LOG(ERROR, "No response from sender");
@@ -238,7 +235,7 @@ int XmodemReceiver::recvPacketHeader() {
             } else {
                 // Receiving a duplicate packet
                 packetSize_ = size;
-                state_ = State::RECV_PACKET_DATA; // Do not restart the timer
+                setState(State::RECV_PACKET_DATA, false);
             }
         } else if (h.num != ((packetNum_ + 1) & 0xff)) {
             LOG(ERROR, "Unexpected packet number: %u", (unsigned)h.num);
@@ -252,11 +249,11 @@ int XmodemReceiver::recvPacketHeader() {
                 ++packetNum_;
                 retryCount_ = 0;
                 packetSize_ = size;
-                state_ = State::RECV_PACKET_DATA;
+                setState(State::RECV_PACKET_DATA, false);
             }
         }
     } else {
-        CHECK(checkTimeout(PACKET_TIMEOUT));
+        checkPacketTimeout();
     }
     return Status::RUNNING;
 }
@@ -284,7 +281,7 @@ int XmodemReceiver::recvPacketData() {
             }
         }
     } else {
-        CHECK(checkTimeout(PACKET_TIMEOUT));
+        checkPacketTimeout();
     }
     return Status::RUNNING;
 }
@@ -318,7 +315,7 @@ int XmodemReceiver::sendEotAck() {
     const size_t n = CHECK(srcStrm_->write(&c, 1));
     if (n > 0) {
         LOG_DEBUG(TRACE, "Sent ACK");
-        return 0;
+        return Status::DONE;
     }
     CHECK(checkTimeout(SEND_TIMEOUT));
     return Status::RUNNING;
@@ -356,9 +353,19 @@ int XmodemReceiver::checkTimeout(unsigned timeout) {
     return 0;
 }
 
-void XmodemReceiver::setState(State state) {
+int XmodemReceiver::checkPacketTimeout() {
+    const int ret = checkTimeout(PACKET_TIMEOUT);
+    if (ret < 0) {
+        setError(ret);
+    }
+    return ret;
+}
+
+void XmodemReceiver::setState(State state, bool restartTimer) {
     state_ = state;
-    stateTime_ = util::millis();
+    if (restartTimer) {
+        stateTime_ = util::millis();
+    }
 }
 
 void XmodemReceiver::setError(int error) {

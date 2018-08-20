@@ -84,7 +84,8 @@ private:
 
     int flush();
     int checkTimeout(unsigned timeout);
-    void setState(State state);
+    int checkPacketTimeout();
+    void setState(State state, bool restartTimer = true);
     void setError(int error);
 };
 
