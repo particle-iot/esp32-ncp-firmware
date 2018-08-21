@@ -56,7 +56,7 @@ int UpdateManager::beginUpdate(size_t size, OutputStream** strm) {
     std::unique_ptr<Data> d(new(std::nothrow) Data);
     CHECK_TRUE(d, RESULT_NO_MEMORY);
     std::unique_ptr<UpdateStream> s(new(std::nothrow) UpdateStream(d.get()));
-    CHECK_TRUE(strm, RESULT_NO_MEMORY);
+    CHECK_TRUE(s, RESULT_NO_MEMORY);
     LOG(INFO, "Initiating the update; expected size: %u", (unsigned)size);
     const auto curPart = esp_ota_get_running_partition();
     LOG(INFO, "Running partition: type: %d, subtype: %d, offset: 0x%08x", (int)curPart->type, (int)curPart->subtype,
