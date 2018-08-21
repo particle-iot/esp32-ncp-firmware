@@ -15,17 +15,32 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGON_NCP_FIRMWARE_UTIL_H
-#define ARGON_NCP_FIRMWARE_UTIL_H
+#pragma once
 
-#include "common.h"
+#include <cstddef>
 
-namespace particle { namespace util {
+namespace particle {
 
-uint64_t millis();
+// Base abstract class for an input stream
+class InputStream {
+public:
+    virtual ~InputStream() = default;
 
-int nvsInitialize();
+    virtual int read(char* data, size_t size) = 0;
+};
 
-} } /* particle::util */
+// Base abstract class for an output stream
+class OutputStream {
+public:
+    virtual ~OutputStream() = default;
 
-#endif /* ARGON_NCP_FIRMWARE_UTIL_H */
+    virtual int write(const char* data, size_t size) = 0;
+};
+
+// Base abstract class for a bidirectional stream
+class Stream:
+        virtual public InputStream,
+        virtual public OutputStream {
+};
+
+} // particle

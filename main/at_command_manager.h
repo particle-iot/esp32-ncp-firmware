@@ -18,8 +18,8 @@
 #ifndef ARGON_NCP_FIRMWARE_AT_COMMAND_MANAGER_H
 #define ARGON_NCP_FIRMWARE_AT_COMMAND_MANAGER_H
 
-#include "util.h"
 #include "at_transport.h"
+#include "common.h"
 
 #include <esp_attr.h>
 /* :( */

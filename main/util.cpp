@@ -16,9 +16,15 @@
  */
 
 #include "util.h"
+
 #include <nvs_flash.h>
+#include <esp_timer.h>
 
 namespace particle { namespace util {
+
+uint64_t millis() {
+    return (esp_timer_get_time() / 1000);
+}
 
 int nvsInitialize() {
     esp_err_t err = nvs_flash_init();
