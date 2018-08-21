@@ -20,21 +20,33 @@
 
 #include "common.h"
 
-namespace particle { namespace ncp {
+namespace particle { 
+
+class OutputStream;
+
+namespace ncp {
 
 class UpdateManager {
 public:
-    static UpdateManager* instance() {
-        static UpdateManager man;
-        return &man;
-    }
+    ~UpdateManager();
 
-    int update(size_t size);
+    int beginUpdate(size_t size, OutputStream** strm);
+    int finishUpdate();
+    void cancelUpdate();
 
-protected:
+    static UpdateManager* instance();
+
+private:
+    struct Data;
+    class UpdateStream;
+
+    std::unique_ptr<Data> d_;
+
     UpdateManager();
 };
 
-} } /* particle::ncp */
+} // particle::ncp
+
+} // particle
 
 #endif /* ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H */

@@ -41,6 +41,9 @@ public:
     }
 
     int writeString(const char* data);
+    int writeNewLine();
+
+    const char* newLineSequence() const;
 
 protected:
     AtCommandManager() = default;
@@ -48,6 +51,10 @@ protected:
 private:
     gpio_config_t gpioConfiguration_[GPIO_NUM_MAX] = {};
 };
+
+inline int AtCommandManager::writeNewLine() {
+    return writeString(newLineSequence());
+}
 
 } } /* particle::ncp */
 
