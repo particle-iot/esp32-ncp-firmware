@@ -41,6 +41,7 @@ public:
     }
 
     int writeString(const char* data);
+    int writeFormatted(const char* fmt, ...);
     int writeNewLine();
 
     const char* newLineSequence() const;

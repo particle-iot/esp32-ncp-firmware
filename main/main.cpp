@@ -23,6 +23,7 @@
 #include "util.h"
 #include "at_transport_uart.h"
 #include "at_command_manager.h"
+#include "version.h"
 
 /* :( */
 extern "C" {
@@ -30,8 +31,6 @@ extern "C" {
 }
 
 extern "C" void app_main(void);
-
-const char* FIRMWARE_VERSION = "0.0.2";
 
 const auto UART_CONF_INSTANCE = UART_NUM_2;
 const auto UART_CONF_TX_PIN = 17;
@@ -73,7 +72,7 @@ int atInitialize() {
     CHECK(AtCommandManager::instance()->init());
 
     /* Initialize AT library */
-    esp_at_module_init(CONFIG_LWIP_MAX_SOCKETS - 1, (const uint8_t*)FIRMWARE_VERSION);
+    esp_at_module_init(CONFIG_LWIP_MAX_SOCKETS - 1, (const uint8_t*)FIRMWARE_VERSION_STRING);
 
     /* Initialize command sets */
     /* Base AT commands */
@@ -101,7 +100,7 @@ int miscInitialize() {
 }
 
 int main() {
-    LOG(INFO, "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION);
+    LOG(INFO, "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION_STRING);
 
     CHECK(nvsInitialize());
     CHECK(atInitialize());

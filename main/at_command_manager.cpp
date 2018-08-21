@@ -21,6 +21,7 @@
 #include "update_manager.h"
 #include "xmodem_receiver.h"
 #include "stream.h"
+#include "version.h"
 
 #include <esp_system.h>
 
@@ -28,13 +29,12 @@
 
 #include <cstring>
 #include <cstdio>
+#include <cstdarg>
 
 /* :( */
 extern "C" {
 #include <esp_at.h>
 }
-
-extern const char* FIRMWARE_VERSION;
 
 namespace particle { namespace ncp {
 
@@ -173,7 +173,7 @@ int AtCommandManager::init() {
         nullptr, /* AT+CGMR? handler */
         nullptr, /* AT+CGMR=(...) handler */
         [](uint8_t*) -> uint8_t { /* AT+CGMR handler */
-            AtCommandManager::instance()->writeString(FIRMWARE_VERSION);
+            AtCommandManager::instance()->writeString(FIRMWARE_VERSION_STRING);
             return ESP_AT_RESULT_CODE_OK;
         }
     };
@@ -421,13 +421,46 @@ int AtCommandManager::init() {
             nullptr /* AT+GPIOW handler */
         }
     };
-    CHECK_TRUE(esp_at_custom_cmd_array_regist(gpio, sizeof(gpio) / sizeof(gpio[0])), ESP_AT_RESULT_CODE_ERROR);
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(gpio, sizeof(gpio) / sizeof(gpio[0])), RESULT_ERROR);
+
+    static esp_at_cmd_struct mver = {
+        (char*)"+MVER",
+        nullptr, // AT+MVER=?
+        nullptr, // AT+MVER?
+        nullptr, // AT+MVER=...
+        [](uint8_t*) -> uint8_t { // AT+MVER
+            const auto self = AtCommandManager::instance();
+            self->writeFormatted("%u", (unsigned)FIRMWARE_MODULE_VERSION);
+            return ESP_AT_RESULT_CODE_OK;
+        }
+    };
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(&mver, 1), RESULT_ERROR);
 
     return 0;
 }
 
 int AtCommandManager::writeString(const char* str) {
     return esp_at_port_write_data((uint8_t*)str, strlen(str)) >= 0 ? 0 : -1;
+}
+
+int AtCommandManager::writeFormatted(const char* fmt, ...) {
+    char buf[128];
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if (n >= (int)sizeof(buf)) {
+        char buf[n + 1]; // Use larger buffer
+        va_start(args, fmt);
+        n = vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);
+        if (n > 0) {
+            n = writeString(buf);
+        }
+    } else if (n > 0) {
+        n = writeString(buf);
+    }
+    return n;
 }
 
 const char* AtCommandManager::newLineSequence() const {
