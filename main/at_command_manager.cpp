@@ -365,7 +365,7 @@ int AtCommandManager::init() {
             nullptr /* AT+GPIOW handler */
         }
     };
-    CHECK_BOOL(esp_at_custom_cmd_array_regist(gpio, sizeof(gpio) / sizeof(gpio[0])));
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(gpio, sizeof(gpio) / sizeof(gpio[0])), ESP_AT_RESULT_CODE_ERROR);
 
     return 0;
 }
