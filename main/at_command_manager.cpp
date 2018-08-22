@@ -16,17 +16,27 @@
  */
 
 #include "at_command_manager.h"
+
+#include "util/scope_guard.h"
+#include "update_manager.h"
+#include "xmodem_receiver.h"
+#include "stream.h"
+#include "version.h"
+
+#include <esp_system.h>
+
+#include <freertos/FreeRTOS.h>
+
 #include <cstring>
 #include <cstdio>
-#include "update_manager.h"
-#include "freertos/FreeRTOS.h"
+#include <cstdarg>
 
 /* :( */
 extern "C" {
-#include "esp_at.h"
+#include <esp_at.h>
 }
 
-extern const char* FIRMWARE_VERSION;
+namespace particle { namespace ncp {
 
 namespace {
 
@@ -41,6 +51,25 @@ enum AtGpioPull {
     AT_GPIO_PULL_NONE = 0,
     AT_GPIO_PULL_DOWN = 1,
     AT_GPIO_PULL_UP   = 2
+};
+
+// TODO: Make AtTransportBase a stream
+class XmodemStream: public Stream {
+public:
+    explicit XmodemStream(AtTransportBase* at) :
+            at_(at) {
+    }
+
+    int read(char* data, size_t size) override {
+        return at_->readData((uint8_t*)data, size);
+    }
+
+    int write(const char* data, size_t size) override {
+        return at_->writeData((const uint8_t*)data, size);
+    }
+
+private:
+    AtTransportBase* at_;
 };
 
 int gpioMapAtPullToEspPull(AtGpioPull pull, gpio_pullup_t& espPullUp, gpio_pulldown_t& espPullDown) {
@@ -137,8 +166,6 @@ int gpioMapEspModeToGpioMode(gpio_mode_t espMode, AtGpioMode& mode) {
 
 } /* anonymous */
 
-namespace particle { namespace ncp {
-
 int AtCommandManager::init() {
     static esp_at_cmd_struct cgmr = {
         (char*)"+CGMR",
@@ -146,7 +173,7 @@ int AtCommandManager::init() {
         nullptr, /* AT+CGMR? handler */
         nullptr, /* AT+CGMR=(...) handler */
         [](uint8_t*) -> uint8_t { /* AT+CGMR handler */
-            AtCommandManager::instance()->writeString(FIRMWARE_VERSION);
+            AtCommandManager::instance()->writeString(FIRMWARE_VERSION_STRING);
             return ESP_AT_RESULT_CODE_OK;
         }
     };
@@ -174,21 +201,49 @@ int AtCommandManager::init() {
         nullptr, /* AT+FWUPD=? handler */
         nullptr, /* AT+FWUPD? handler */
         [](uint8_t) -> uint8_t { /* AT+FWUPD=(...) handler */
-            int32_t sizeVal;
-            if (esp_at_get_para_as_digit(0, &sizeVal) == ESP_AT_PARA_PARSE_RESULT_OK && sizeVal > 0) {
-                auto transport = AtTransportBase::instance();
-                if (transport) {
-                    esp_at_response_result(ESP_AT_RESULT_CODE_OK);
-                    esp_at_port_wait_write_complete(portMAX_DELAY);
-
-                    transport->setDirectMode(true);
-                    int r = UpdateManager::instance()->update(sizeVal);
-                    transport->setDirectMode(false);
-                    if (r) {
-                        LOG(ERROR, "Update failed: %d", r);
-                    }
-                }
+            int32_t size;
+            if (esp_at_get_para_as_digit(0, &size) != ESP_AT_PARA_PARSE_RESULT_OK || size <= 0) {
+                return ESP_AT_RESULT_CODE_ERROR;
             }
+            // Initiate the update
+            OutputStream* updStrm = nullptr;
+            const auto updMgr = UpdateManager::instance();
+            CHECK_RETURN(updMgr->beginUpdate(size, &updStrm), ESP_AT_RESULT_CODE_ERROR);
+            SCOPE_GUARD({
+                updMgr->cancelUpdate();
+            });
+            const auto at = AtTransportBase::instance();
+            XmodemStream atStrm(at);
+            XmodemReceiver xmodem;
+            CHECK(xmodem.init(&atStrm, updStrm, size));
+            // Send an intermediate result code
+            const auto self = AtCommandManager::instance();
+            self->writeString("+FWUPD: ONGOING");
+            self->writeNewLine();
+            // Receive the firmware binary
+            at->setDirectMode(true);
+            int ret = 0;
+            do {
+                ret = xmodem.run();
+            } while (ret == XmodemReceiver::RUNNING);
+            // Discard any extra CAN bytes that might have been sent by the sender at the end of
+            // the XModem transfer
+            at->flushInput();
+            at->setDirectMode(false);
+            if (ret != XmodemReceiver::DONE) {
+                LOG(ERROR, "XModem transfer failed: %d", ret);
+                return ESP_AT_RESULT_CODE_ERROR;
+            }
+            // Apply the update
+            ret = updMgr->finishUpdate();
+            if (ret == 0) {
+                LOG(INFO, "Resetting the system to apply the update");
+                // Send a final result code
+                esp_at_response_result(ESP_AT_RESULT_CODE_OK);
+                at->waitWriteComplete(1000);
+                esp_restart();
+            }
+            LOG(ERROR, "Firmware update failed: %d", ret);
             return ESP_AT_RESULT_CODE_ERROR;
         },
         nullptr /* AT+FWUPD handler */
@@ -365,13 +420,50 @@ int AtCommandManager::init() {
             nullptr /* AT+GPIOW handler */
         }
     };
-    CHECK_TRUE(esp_at_custom_cmd_array_regist(gpio, sizeof(gpio) / sizeof(gpio[0])), ESP_AT_RESULT_CODE_ERROR);
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(gpio, sizeof(gpio) / sizeof(gpio[0])), RESULT_ERROR);
+
+    static esp_at_cmd_struct mver = {
+        (char*)"+MVER",
+        nullptr, // AT+MVER=?
+        nullptr, // AT+MVER?
+        nullptr, // AT+MVER=...
+        [](uint8_t*) -> uint8_t { // AT+MVER
+            const auto self = AtCommandManager::instance();
+            self->writeFormatted("%u", (unsigned)FIRMWARE_MODULE_VERSION);
+            return ESP_AT_RESULT_CODE_OK;
+        }
+    };
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(&mver, 1), RESULT_ERROR);
 
     return 0;
 }
 
 int AtCommandManager::writeString(const char* str) {
     return esp_at_port_write_data((uint8_t*)str, strlen(str)) >= 0 ? 0 : -1;
+}
+
+int AtCommandManager::writeFormatted(const char* fmt, ...) {
+    char buf[128];
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if (n >= (int)sizeof(buf)) {
+        std::unique_ptr<char[]> buf(new char[n + 1]); // Use a larger buffer
+        va_start(args, fmt);
+        n = vsnprintf(buf.get(), n + 1, fmt, args);
+        va_end(args);
+        if (n > 0) {
+            n = writeString(buf.get());
+        }
+    } else if (n > 0) {
+        n = writeString(buf);
+    }
+    return n;
+}
+
+const char* AtCommandManager::newLineSequence() const {
+    return (const char*)esp_at_custom_cmd_line_terminator_get();
 }
 
 } } /* particle::ncp */

@@ -17,102 +17,70 @@
 
 #include "update_manager.h"
 
-#include "at_transport.h"
-#include "xmodem_receiver.h"
 #include "stream.h"
-#include "util.h"
 
-#include "esp_system.h"
-#include "esp_ota_ops.h"
+#include <esp_ota_ops.h>
 
-namespace particle { namespace ncp {
+namespace particle {
 
-namespace {
+namespace ncp {
 
-class FirmwareUpdateStream: public OutputStream {
-public:
-    explicit FirmwareUpdateStream(esp_ota_handle_t ota) :
-            ota_(ota) {
-    }
+struct UpdateManager::Data: public OutputStream {
+    esp_ota_handle_t ota; // OTA handle
+    const esp_partition_t* otaPart; // Target partition
 
     int write(const char* data, size_t size) override {
-        CHECK_ESP(esp_ota_write(ota_, data, size));
+        CHECK_ESP(esp_ota_write(ota, data, size));
         return size;
     }
-
-private:
-    esp_ota_handle_t ota_;
 };
-
-// TODO: Make AtTransportBase a stream
-class XmodemStream: public Stream {
-public:
-    explicit XmodemStream(AtTransportBase* at) :
-            at_(at) {
-    }
-
-    int read(char* data, size_t size) override {
-        return at_->readData((uint8_t*)data, size);
-    }
-
-    int write(const char* data, size_t size) override {
-        return at_->writeData((const uint8_t*)data, size);
-    }
-
-private:
-    AtTransportBase* at_;
-};
-
-} // particle::ncp::
 
 UpdateManager::UpdateManager() {
 }
 
-int UpdateManager::update(size_t size) {
-    LOG(INFO, "Initiating update");
+UpdateManager::~UpdateManager() {
+}
 
-    const auto transport = AtTransportBase::instance();
-    CHECK_TRUE(transport, RESULT_ERROR);
-    transport->flushInput();
-
-    XmodemStream srcStrm(transport);
-
-    /* Initiate OTA update */
-    const esp_partition_t* curPart = esp_ota_get_running_partition();
+int UpdateManager::beginUpdate(size_t size, OutputStream** strm) {
+    CHECK_FALSE(d_, RESULT_INVALID_STATE);
+    std::unique_ptr<Data> d(new(std::nothrow) Data);
+    CHECK_TRUE(d, RESULT_NO_MEMORY);
+    LOG(INFO, "Initiating the update; expected size: %u", (unsigned)size);
+    const auto curPart = esp_ota_get_running_partition();
     LOG(INFO, "Running partition: type: %d, subtype: %d, offset: 0x%08x", (int)curPart->type, (int)curPart->subtype,
             (unsigned)curPart->address);
-    const esp_partition_t* updPart = esp_ota_get_next_update_partition(nullptr);
-    LOG(INFO, "Writing to partition: type: %d, subtype: %d, offset: 0x%08x", (int)updPart->type, (int)updPart->subtype,
-            (unsigned)updPart->address);
-
-    esp_ota_handle_t ota = 0;
-    CHECK_ESP(esp_ota_begin(updPart, size, &ota));
-    LOG(INFO, "Expected size %d", size);
-
-    FirmwareUpdateStream destStrm(ota);
-
-    XmodemReceiver xmodem;
-    CHECK(xmodem.init(&srcStrm, &destStrm, size));
-
-    int ret = 0;
-    do {
-        ret = xmodem.run();
-    } while (ret == XmodemReceiver::RUNNING);
-
-    if (ret == 0) {
-        /* Apply the update */
-        LOG(INFO, "Applying the update...");
-        CHECK_ESP(esp_ota_end(ota));
-        CHECK_ESP(esp_ota_set_boot_partition(updPart));
-        transport->waitWriteComplete(1000);
-        esp_restart();
-    } else {
-        LOG(ERROR, "Xmodem receiver error: %d", ret);
-        esp_ota_end(ota);
-        return RESULT_ERROR;
-    }
-
+    d->otaPart = esp_ota_get_next_update_partition(nullptr);
+    LOG(INFO, "Writing to partition: type: %d, subtype: %d, offset: 0x%08x", (int)d->otaPart->type,
+            (int)d->otaPart->subtype, (unsigned)d->otaPart->address);
+    CHECK_ESP(esp_ota_begin(d->otaPart, size, &d->ota));
+    d_ = std::move(d);
+    *strm = d_.get();
     return 0;
 }
 
-} } /* particle::ncp */
+int UpdateManager::finishUpdate() {
+    CHECK_TRUE(d_, RESULT_INVALID_STATE);
+    const std::unique_ptr<Data> d(d_.release());
+    LOG(INFO, "Finishing the update");
+    CHECK_ESP(esp_ota_end(d->ota));
+    CHECK_ESP(esp_ota_set_boot_partition(d->otaPart));
+    return 0;
+}
+
+void UpdateManager::cancelUpdate() {
+    if (d_) {
+        // Finish the update but don't change the boot partition
+        LOG(INFO, "Cancelling the update");
+        esp_ota_end(d_->ota);
+        d_.reset();
+    }
+}
+
+UpdateManager* UpdateManager::instance() {
+    static UpdateManager m;
+    return &m;
+}
+
+} // particle::ncp
+
+} // particle

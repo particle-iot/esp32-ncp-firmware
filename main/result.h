@@ -31,6 +31,16 @@
             _ret; \
         })
 
+#define CHECK_RETURN(_expr, _val) \
+        ({ \
+            const auto _ret = _expr; \
+            if (_ret < 0) { \
+                LOG(ERROR, #_expr " failed: %d", (int)_ret); \
+                return _val; \
+            } \
+            _ret; \
+        })
+
 #define CHECK_TRUE(_expr, _ret) \
         ({ \
             const bool _ok = (bool)(_expr); \
@@ -40,6 +50,9 @@
             } \
             ::particle::RESULT_OK; \
         })
+
+#define CHECK_FALSE(_expr, _ret) \
+        CHECK_TRUE(!(_expr), _ret)
 
 #define ESP_ERROR_TO_NEGATIVE(_err) \
         (_err > 0 ? -_err : _err)

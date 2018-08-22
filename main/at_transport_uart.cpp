@@ -59,7 +59,7 @@ int AtUartTransport::destroyTransport() {
 
         /* Join thread */
         while (exit_) {
-            vTaskDelay(100 * portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
 
         thread_ = nullptr;
@@ -97,7 +97,7 @@ int AtUartTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
         return 0;
     }
 
-    return uart_read_bytes(conf_.uart, data, len, timeoutMsec * portTICK_PERIOD_MS);
+    return uart_read_bytes(conf_.uart, data, len, timeoutMsec / portTICK_PERIOD_MS);
 }
 
 int AtUartTransport::flushInput() {
@@ -127,7 +127,7 @@ int AtUartTransport::waitWriteComplete(unsigned int timeoutMsec) {
     }
 
     /* Avoid multiplication here */
-    const unsigned int t = timeoutMsec != portMAX_DELAY ? timeoutMsec * portTICK_PERIOD_MS : timeoutMsec;
+    const unsigned int t = timeoutMsec != portMAX_DELAY ? timeoutMsec / portTICK_PERIOD_MS : timeoutMsec;
     return CHECK_ESP(uart_wait_tx_done(conf_.uart, t));
 }
 

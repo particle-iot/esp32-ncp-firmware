@@ -15,38 +15,13 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H
-#define ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H
+#pragma once
 
 #include "common.h"
 
-namespace particle { 
+namespace particle {
 
-class OutputStream;
-
-namespace ncp {
-
-class UpdateManager {
-public:
-    ~UpdateManager();
-
-    // Note: UpdateManager retains ownership over the stream object
-    int beginUpdate(size_t size, OutputStream** strm);
-    int finishUpdate();
-    void cancelUpdate();
-
-    static UpdateManager* instance();
-
-private:
-    struct Data;
-
-    std::unique_ptr<Data> d_;
-
-    UpdateManager();
-};
-
-} // particle::ncp
+const char* const FIRMWARE_VERSION_STRING = "0.0.2";
+const uint16_t FIRMWARE_MODULE_VERSION = 2;
 
 } // particle
-
-#endif /* ARGON_NCP_FIRMWARE_UPDATE_MANAGER_H */
