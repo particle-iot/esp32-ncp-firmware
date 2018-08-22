@@ -21,7 +21,10 @@
 
 namespace particle {
 
-const char* const FIRMWARE_VERSION_STRING = "0.0.2";
-const uint16_t FIRMWARE_MODULE_VERSION = 2;
+#define xstr(x) str(x)
+#define str(x) #x
+
+const char* const FIRMWARE_VERSION_STRING = xstr(ARGON_FIRMWARE_VERSION);
+const uint16_t FIRMWARE_MODULE_VERSION = ARGON_FIRMWARE_MODULE_VERSION;
 
 } // particle
