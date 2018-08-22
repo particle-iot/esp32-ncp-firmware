@@ -211,7 +211,6 @@ int AtCommandManager::init() {
             CHECK_RETURN(updMgr->beginUpdate(size, &updStrm), ESP_AT_RESULT_CODE_ERROR);
             SCOPE_GUARD({
                 updMgr->cancelUpdate();
-                delete updStrm;
             });
             const auto at = AtTransportBase::instance();
             XmodemStream atStrm(at);
@@ -450,12 +449,12 @@ int AtCommandManager::writeFormatted(const char* fmt, ...) {
     int n = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
     if (n >= (int)sizeof(buf)) {
-        char buf[n + 1]; // Use larger buffer
+        std::unique_ptr<char[]> buf(new char[n + 1]); // Use a larger buffer
         va_start(args, fmt);
-        n = vsnprintf(buf, sizeof(buf), fmt, args);
+        n = vsnprintf(buf.get(), n + 1, fmt, args);
         va_end(args);
         if (n > 0) {
-            n = writeString(buf);
+            n = writeString(buf.get());
         }
     } else if (n > 0) {
         n = writeString(buf);
@@ -464,7 +463,7 @@ int AtCommandManager::writeFormatted(const char* fmt, ...) {
 }
 
 const char* AtCommandManager::newLineSequence() const {
-    return "\r\n"; // FIXME: Use application settings
+    return (const char*)esp_at_custom_cmd_line_terminator_get();
 }
 
 } } /* particle::ncp */

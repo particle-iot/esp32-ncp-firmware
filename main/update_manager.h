@@ -30,6 +30,7 @@ class UpdateManager {
 public:
     ~UpdateManager();
 
+    // Note: UpdateManager retains ownership over the stream object
     int beginUpdate(size_t size, OutputStream** strm);
     int finishUpdate();
     void cancelUpdate();
@@ -38,7 +39,6 @@ public:
 
 private:
     struct Data;
-    class UpdateStream;
 
     std::unique_ptr<Data> d_;
 

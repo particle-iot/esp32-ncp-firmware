@@ -25,24 +25,14 @@ namespace particle {
 
 namespace ncp {
 
-struct UpdateManager::Data {
+struct UpdateManager::Data: public OutputStream {
     esp_ota_handle_t ota; // OTA handle
     const esp_partition_t* otaPart; // Target partition
-};
-
-class UpdateManager::UpdateStream: public OutputStream {
-public:
-    explicit UpdateStream(UpdateManager::Data* d) :
-            d_(d) {
-    }
 
     int write(const char* data, size_t size) override {
-        CHECK_ESP(esp_ota_write(d_->ota, data, size));
+        CHECK_ESP(esp_ota_write(ota, data, size));
         return size;
     }
-
-private:
-    UpdateManager::Data* const d_;
 };
 
 UpdateManager::UpdateManager() {
@@ -55,8 +45,6 @@ int UpdateManager::beginUpdate(size_t size, OutputStream** strm) {
     CHECK_FALSE(d_, RESULT_INVALID_STATE);
     std::unique_ptr<Data> d(new(std::nothrow) Data);
     CHECK_TRUE(d, RESULT_NO_MEMORY);
-    std::unique_ptr<UpdateStream> s(new(std::nothrow) UpdateStream(d.get()));
-    CHECK_TRUE(s, RESULT_NO_MEMORY);
     LOG(INFO, "Initiating the update; expected size: %u", (unsigned)size);
     const auto curPart = esp_ota_get_running_partition();
     LOG(INFO, "Running partition: type: %d, subtype: %d, offset: 0x%08x", (int)curPart->type, (int)curPart->subtype,
@@ -66,7 +54,7 @@ int UpdateManager::beginUpdate(size_t size, OutputStream** strm) {
             (int)d->otaPart->subtype, (unsigned)d->otaPart->address);
     CHECK_ESP(esp_ota_begin(d->otaPart, size, &d->ota));
     d_ = std::move(d);
-    *strm = s.release(); // Transfer ownership
+    *strm = d_.get();
     return 0;
 }
 
