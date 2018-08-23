@@ -80,6 +80,23 @@ Example:
 < OK
 ```
 
+### AT+MVER
+
+Retrieves Argon MCP firmware module version.
+
+#### Format
+
+```
+AT+MVER
+```
+
+Example:
+```
+> AT+MVER
+< 1
+< OK
+```
+
 ### AT+FWUPD
 
 Initiates firmware update process and starts XModem server.
@@ -96,11 +113,12 @@ Example:
 
 ```
 > AT+FWUPD=123456
-< OK
-> (XModem transfer initiated)
+< +FWUPD: ONGOING
+> (XModem transfer)
+> OK
 ```
 
-After the XModem transfer completes, the NCP will either reset and boot into the new firmware, or the NCP will respond with `ERROR`.
+After the XModem transfer completes, the NCP will output the final result code. In case of OK, the NCP will restart, in case of an ERROR will continue execution.
 
 ### AT+GPIOC
 
@@ -132,16 +150,16 @@ _NOTE:_ Only the pins that were previously configured using `AT+GPIOC` will be p
 
 ```
 AT+GPIOC?
-<pin0>,<gpio_mode>,<gpio_pull>
-<pin1>,<gpio_mode>,<gpio_pull>
++GPIOC: <pin0>,<gpio_mode>,<gpio_pull>
++GPIOC: <pin1>,<gpio_mode>,<gpio_pull>
 ...
 ```
 
 Example:
 ```
 > AT+GPIOC?
-< 2,2,0
-< 4,1,0
+< +GPIOC: 2,2,0
+< +GPIOC: 4,1,0
 <
 < OK
 ```
@@ -195,7 +213,7 @@ AT+GPIOR=<pin>
 Example:
 ```
 > AT+GPIOR=4
-< 1
+< +GPIOR: 1
 < OK
 ```
 
