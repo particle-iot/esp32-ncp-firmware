@@ -267,11 +267,9 @@ int AtCommandManager::init() {
             },
             [](uint8_t* cmd) -> uint8_t { /* AT+GPIOC? handler */
                 auto term = esp_at_custom_cmd_line_terminator_get();
-                AtCommandManager::instance()->writeString((const char*)cmd);
-                AtCommandManager::instance()->writeString((const char*)term);
                 auto self = AtCommandManager::instance();
                 for (uint8_t p = GPIO_NUM_0; p < GPIO_NUM_MAX; p++) {
-                    char buf[16] = {};
+                    char buf[32] = {};
                     const auto conf = self->gpioConfiguration_[p];
                     if (!conf.pin_bit_mask) {
                         continue;
@@ -284,7 +282,7 @@ int AtCommandManager::init() {
                     if (gpioMapEspPullToAtPull(conf.pull_up_en, conf.pull_down_en, pull)) {
                         continue;
                     }
-                    snprintf(buf, sizeof(buf), "%d,%d,%d%s", p, mode, pull, term);
+                    snprintf(buf, sizeof(buf), "%s: %d,%d,%d%s", (const char*)cmd, p, mode, pull, term);
                     self->writeString(buf);
                 }
                 return ESP_AT_RESULT_CODE_OK;
@@ -371,9 +369,10 @@ int AtCommandManager::init() {
 
                 int level = gpio_get_level((gpio_num_t)pin);
 
-                char buf[8] = {};
-                snprintf(buf, sizeof(buf), "%d", level);
+                char buf[32] = {};
+                snprintf(buf, sizeof(buf), "+GPIOR: %d", level);
                 self->writeString(buf);
+                self->writeNewLine();
 
                 return ESP_AT_RESULT_CODE_OK;
             },
