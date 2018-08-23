@@ -1,4 +1,6 @@
-PROJECT_NAME := argon-ncp-firmware
+include version.mk
+
+PROJECT_NAME := argon-ncp-firmware-$(FIRMWARE_VERSION)
 
 # Set default IDF_PATH
 PROJECT_DIR := $(PWD)

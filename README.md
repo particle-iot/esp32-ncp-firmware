@@ -29,6 +29,17 @@ $ make factory_bin
 
 The combined 4MB factory binary will be written to `build/factory.bin`.
 
+## Building modular firmware for flashing via BLE/OTA/Ymodem in Device OS
+
+```
+$make module
+```
+
+## Updating the version information
+
+Please edit version.mk and perform a clean build. 
+
+
 ## Updating the firmware using XModem
 
 By default, the firmware runs an AT command interface on UART2 (TX: GPIO17, RX: GPIO16, HW flow control disabled).
