@@ -32,16 +32,16 @@ extern "C" {
 
 extern "C" void app_main(void);
 
-const auto UART_CONF_INSTANCE = UART_NUM_2;
-const auto UART_CONF_TX_PIN = 17;
-const auto UART_CONF_RX_PIN = 16;
-const auto UART_CONF_RTS_PIN = 18;
+const auto UART_CONF_INSTANCE = UART_NUM_0;
+const auto UART_CONF_TX_PIN = 1;
+const auto UART_CONF_RX_PIN = 3;
+const auto UART_CONF_RTS_PIN = 22;
 const auto UART_CONF_CTS_PIN = 19;
 const auto UART_CONF_BAUD_RATE = 921600;
 const auto UART_CONF_DATA_BITS = UART_DATA_8_BITS;
 const auto UART_CONF_PARITY = UART_PARITY_DISABLE;
 const auto UART_CONF_STOP_BITS = UART_STOP_BITS_1;
-const auto UART_CONF_FLOW_CONTROL = UART_HW_FLOWCTRL_DISABLE;
+const auto UART_CONF_FLOW_CONTROL = UART_HW_FLOWCTRL_CTS_RTS;
 /* magick number */
 const auto UART_CONF_RX_FLOW_CTRL_THRESH = 122;
 
