@@ -1,7 +1,7 @@
 # module version as a C literal
-MODULE_VERSION?=1
+MODULE_VERSION?=2
 # module version as hex string in little endian format
-MODULE_VERSION_LE?=0100
+MODULE_VERSION_LE?=0200
 
 FIRMWARE_VERSION?=0.0.2
 

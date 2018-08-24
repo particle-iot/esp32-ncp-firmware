@@ -31,7 +31,7 @@ else ifeq (WINDOWS,$(MAKE_OS))
 SHA_256 = $(COMMON_BUILD)/bin/win32/sha256sum
 endif
 
-OUT=build/argon-ncp-firmware
+OUT=build/$(PROJECT_NAME)
 BIN=$(OUT).bin
 MODULE=$(OUT).module
 PREFIX=$(OUT).prefix
