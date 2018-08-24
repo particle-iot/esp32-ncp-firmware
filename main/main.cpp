@@ -104,6 +104,7 @@ int main() {
 
     CHECK(nvsInitialize());
     CHECK(atInitialize());
+    CHECK(miscInitialize());
 
     LOG(INFO, "Initialized");
 
