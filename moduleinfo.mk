@@ -43,7 +43,7 @@ START_ADDR=00000000	 # not used
 END_ADDR=00000000	 # not used
 NCP_ID=21			 # 33 (see hal/src/hRF52840/platform_ncp.h)
 RESERVED2=00		 # not used
-MODULE_VERSION_LE=0100	 # 0x0001
+# MODULE_VERSION_LE=0100	 # 0x0001
 PLATFORM_ID=0C00	 # 12 - Argon
 MODULE_FUNCTION=03   # mono firmware
 MODULE_INDEX=00		 # not used with mono firmware
@@ -52,28 +52,30 @@ DEPENDENCY2=00000000
 MODULE_PREFIX=$(START_ADDR)$(END_ADDR)$(NCP_ID)$(RESERVED2)$(MODULE_VERSION_LE)$(PLATFORM_ID)$(MODULE_FUNCTION)$(MODULE_INDEX)$(DEPENDENCY)$(DEPENDENCY2)
 
 # regular MCU firmware has the product ID stored before the suffix
-# since this has little relevance here we don't bother	
+# since this has little relevance here we don't bother
 RESERVED_U16=0000
 DEFAULT_SHA_256=0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
 SUFFIX_SIZE=2400		# 36
 CRC32=00000000
-MODULE_SUFFIX=$(RESERVED_U16)$(DEFAULT_SHA_256)$(SUFFIX_SIZE)$(CRC32)
+MODULE_SUFFIX=$(RESERVED_U16)$(DEFAULT_SHA_256)$(SUFFIX_SIZE)
 
-prefix: 
+MODULE_SUFFIX_PLUS_PREFIX_SIZE=60
+
+prefix:
 	# patch the end address with the length of the file
 	# build the default prefix using static data
 	# use perl to convert the filesize into hex and make little endian 
 	# xxd to convert this to binary and write in place to offset 4 in the file 
 	echo $(MODULE_PREFIX) | xxd -r -p > $(PREFIX)
-	echo "print scalar reverse unpack \"h*\", pack \"H*\", sprintf(\"%08X\"," $(call filesize,$(BIN)) ")" | perl -l | \
+	echo "print scalar reverse unpack \"h*\", pack \"H*\", sprintf(\"%08X\"," $(shell expr $(call filesize,$(BIN)) + $(MODULE_SUFFIX_PLUS_PREFIX_SIZE)) ")" | perl -l | \
 	$(XXD) -r -p | \
 	dd bs=1 of=$(PREFIX) seek=4 conv=notrunc $(VERBOSE_REDIRECT)
 
 suffix:
 	echo "$(MODULE_SUFFIX)" | xxd -r -p > $(SUFFIX)
 	$(SHA_256) $(BIN) | cut -c 1-65 | $(XXD) -r -p | dd bs=1 of=$(SUFFIX) seek=2 conv=notrunc $(VERBOSE_REDIRECT)
-	$(CRC) $(BIN) | cut -c 1-10 | $(XXD) -r -p | dd bs=1 of=$(SUFFIX) seek=36 conv=notrunc $(VERBOSE_REDIRECT)
-	
+	cat $(PREFIX) $(BIN) $(SUFFIX) > $(MODULE)
+	$(CRC) $(MODULE) | cut -c 1-10 | $(XXD) -r -p | dd bs=1 of=$(SUFFIX) seek=36 conv=notrunc $(VERBOSE_REDIRECT)
 
 module: all prefix suffix
 	$(call echo,"Making module from binary")
