@@ -434,23 +434,38 @@ int AtCommandManager::init() {
     };
     CHECK_TRUE(esp_at_custom_cmd_array_regist(&mver, 1), RESULT_ERROR);
 
-    static esp_at_cmd_struct cipstamac = {
-        (char*)"+CIPSTAMAC",
-        nullptr, // AT+CIPSTAMAC=?
-        [](uint8_t* cmd) -> uint8_t { // AT+CIPSTAMAC?
+    static esp_at_cmd_struct mac = {
+        (char*)"+GETMAC",
+        [](uint8_t*) -> uint8_t { /* AT+GETMAC=? handler */
+            static const char response[] = "+GETMAC: (0-3)";
+            /* +GETMAC=<type>
+             * <type>: 0 - WiFi Station, 1 - WiFi AP, 2 - Bluetooth, 3 - Ethernet
+             */
+            auto self = AtCommandManager::instance();
+            self->writeString(response);
+            return ESP_AT_RESULT_CODE_OK;
+        },
+        nullptr, // AT+GETMAC?
+        [](uint8_t argc) -> uint8_t { // AT+GETMAC=(...)
+            int32_t type;
+            if (esp_at_get_para_as_digit(0, &type) != ESP_AT_PARA_PARSE_RESULT_OK ||
+                ((type != ESP_MAC_WIFI_STA) && (type != ESP_MAC_WIFI_SOFTAP) &&
+                 (type != ESP_MAC_BT) && (type != ESP_MAC_ETH))) {
+                return ESP_AT_RESULT_CODE_ERROR;
+            }
+
             const auto self = AtCommandManager::instance();
             uint8_t mac[6] = {};
-            CHECK_ESP_RESULT(esp_read_mac(mac, ESP_MAC_WIFI_STA), ESP_AT_RESULT_CODE_ERROR);
+            CHECK_ESP_RESULT(esp_read_mac(mac, (esp_mac_type_t)type), ESP_AT_RESULT_CODE_ERROR);
             char buf[32] = {};
-            snprintf(buf, sizeof(buf), "%s: %02x:%02x:%02x:%02x:%02x:%02x", (const char*)cmd,
+            snprintf(buf, sizeof(buf), "+GETMAC: %02x:%02x:%02x:%02x:%02x:%02x",
                         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             self->writeString(buf);
             return ESP_AT_RESULT_CODE_OK;
         },
-        nullptr, // AT+CIPSTAMAC=(...)
-        nullptr // AT+CIPSTAMAC
+        nullptr // AT+GETMAC
     };
-    CHECK_TRUE(esp_at_custom_cmd_array_regist(&cipstamac, 1), RESULT_ERROR);
+    CHECK_TRUE(esp_at_custom_cmd_array_regist(&mac, 1), RESULT_ERROR);
 
     return 0;
 }
