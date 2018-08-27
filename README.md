@@ -260,3 +260,35 @@ Example:
 > AT+GPIOW=1,0
 < OK
 ```
+
+### AT+GETMAC
+
+#### Query command
+
+Retrieves the expected command parameters and their ranges.
+
+```
+AT+GETMAC=?
+```
+
+Example:
+```
+> AT+GETMAC=?
+< +GETMAC: (0-3)
+< OK
+```
+
+#### Setup command
+
+```
+AT+GETMAC=<type>
+```
+
+- `<type>`, 0 - WiFi Station, 1 - WiFi AP, 2 - Bluetooth, 3 - Ethernet
+
+Example:
+```
+> AT+GETMAC=0
+< +GETMAC: "24:0a:c4:10:9d:f4"
+< OK
+```
