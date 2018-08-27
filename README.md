@@ -289,6 +289,6 @@ AT+GETMAC=<type>
 Example:
 ```
 > AT+GETMAC=0
-< +GETMAC: 24:0a:c4:10:9d:f4
+< +GETMAC: "24:0a:c4:10:9d:f4"
 < OK
 ```
