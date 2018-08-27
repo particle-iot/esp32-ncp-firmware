@@ -67,6 +67,16 @@
             _ret; \
         })
 
+#define CHECK_ESP_RESULT(_expr, _val) \
+        ({ \
+            const auto _ret = _expr; \
+            if (_ret != ESP_OK) { \
+                LOG(ERROR, #_expr " failed: %s", esp_err_to_name(_ret)); \
+                return _val; \
+            } \
+            _ret; \
+        })
+
 namespace particle {
 
 enum Result: int {
