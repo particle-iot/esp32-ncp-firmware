@@ -38,6 +38,7 @@ script:
   # Build project from the git repository
   - make
   - make module
+  - make factory_bin
 
 notifications:
   slack: s:uyDgDeY2Sric20NcE50P11QS
