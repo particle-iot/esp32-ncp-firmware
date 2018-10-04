@@ -36,6 +36,11 @@ extern "C" {
 #include <esp_at.h>
 }
 
+#include <memory>
+#include "at_transport_mux.h"
+
+extern std::unique_ptr<particle::ncp::AtMuxTransport> g_muxTransport;
+
 namespace particle { namespace ncp {
 
 namespace {
@@ -53,24 +58,7 @@ enum AtGpioPull {
     AT_GPIO_PULL_UP   = 2
 };
 
-// TODO: Make AtTransportBase a stream
-class XmodemStream: public Stream {
-public:
-    explicit XmodemStream(AtTransportBase* at) :
-            at_(at) {
-    }
-
-    int read(char* data, size_t size) override {
-        return at_->readData((uint8_t*)data, size);
-    }
-
-    int write(const char* data, size_t size) override {
-        return at_->writeData((const uint8_t*)data, size);
-    }
-
-private:
-    AtTransportBase* at_;
-};
+using XmodemStream = ::particle::ncp::AtTransportStream;
 
 int gpioMapAtPullToEspPull(AtGpioPull pull, gpio_pullup_t& espPullUp, gpio_pulldown_t& espPullDown) {
     switch (pull) {
@@ -188,7 +176,23 @@ int AtCommandManager::init() {
             return ESP_AT_RESULT_CODE_ERROR;
         },
         [](uint8_t) -> uint8_t { /* AT+CMUX=(...) handler */
-            return ESP_AT_RESULT_CODE_ERROR;
+            // Do not allow to execut AT+CMUX within multiplexed session
+            if (g_muxTransport->isActive()) {
+                LOG(ERROR, "Received AT+CMUX while in multiplexed mode");
+                return ESP_AT_RESULT_CODE_ERROR;
+            }
+
+            LOG(INFO, "Received AT+CMUX, switching to multiplexed mode");
+
+            CHECK_TRUE(g_muxTransport, ESP_AT_RESULT_CODE_ERROR);
+            CHECK_RETURN(g_muxTransport->startMuxer(), ESP_AT_RESULT_CODE_ERROR);
+
+            esp_at_response_result(ESP_AT_RESULT_CODE_OK);
+            esp_at_port_wait_write_complete(1000);
+
+            // Switch to muxed transport
+            g_muxTransport->setActive();
+            return ESP_AT_RESULT_CODE_PROCESS_DONE;
         },
         [](uint8_t*) -> uint8_t { /* AT+CMUX handler */
             return ESP_AT_RESULT_CODE_ERROR;

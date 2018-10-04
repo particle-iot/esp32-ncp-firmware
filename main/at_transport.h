@@ -23,6 +23,7 @@
 #include <atomic>
 #include <sys/types.h>
 #include "common.h"
+#include "stream.h"
 
 #include <esp_attr.h>
 /* :( */
@@ -40,10 +41,14 @@ public:
     int destroy();
     int postInit();
 
-    void setDirectMode(bool direct);
+    typedef void (*DataNotificationHandler)(size_t len, void* ctx);
+
+    void setDirectMode(bool direct, DataNotificationHandler handler = nullptr, void* ctx = nullptr);
     bool isDirectMode() const;
 
     static AtTransportBase* instance();
+    virtual void setActive();
+    bool isActive() const;
 
     virtual int readData(uint8_t* data, ssize_t len, unsigned int timeoutMsec = 1) = 0;
     virtual int flushInput() = 0;
@@ -79,7 +84,27 @@ private:
 
 private:
     std::atomic_bool direct_;
+    DataNotificationHandler handler_ = nullptr;
+    void* handlerCtx_ = nullptr;
     static AtTransportBase* instance_;
+};
+
+class AtTransportStream: public Stream {
+public:
+    explicit AtTransportStream(AtTransportBase* at) :
+            at_(at) {
+    }
+
+    int read(char* data, size_t size) override {
+        return at_->readData((uint8_t*)data, size);
+    }
+
+    int write(const char* data, size_t size) override {
+        return at_->writeData((const uint8_t*)data, size);
+    }
+
+private:
+    AtTransportBase* at_;
 };
 
 } } /* particle::ncp */

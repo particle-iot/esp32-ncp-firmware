@@ -30,8 +30,6 @@ AtTransportBase::~AtTransportBase() {
 }
 
 int AtTransportBase::init() {
-    assert(instance_ == nullptr);
-
     CHECK(initTransport());
 
     esp_at_device_ops_struct deviceOps = {
@@ -50,7 +48,9 @@ int AtTransportBase::init() {
     esp_at_device_ops_regist(&deviceOps);
     esp_at_custom_ops_regist(&customOps);
 
-    instance_ = this;
+    if (!instance_) {
+        setActive();
+    }
 
     return 0;
 }
@@ -60,13 +60,17 @@ int AtTransportBase::destroy() {
         return 0;
     }
 
-    instance_ = nullptr;
+    if (instance_ == this) {
+        instance_ = nullptr;
+    }
 
     CHECK(destroyTransport());
 
-    /* Does this work? */
-    esp_at_device_ops_regist(nullptr);
-    esp_at_custom_ops_regist(nullptr);
+    if (!instance_) {
+        /* Does this work? */
+        esp_at_device_ops_regist(nullptr);
+        esp_at_custom_ops_regist(nullptr);
+    }
 
     return 0;
 }
@@ -75,8 +79,10 @@ int AtTransportBase::postInit() {
     return postInitTransport();
 }
 
-void AtTransportBase::setDirectMode(bool direct) {
+void AtTransportBase::setDirectMode(bool direct, DataNotificationHandler handler, void* ctx) {
     direct_ = direct;
+    handler_ = handler;
+    handlerCtx_ = ctx;
 }
 
 bool AtTransportBase::isDirectMode() const {
@@ -87,8 +93,19 @@ AtTransportBase* AtTransportBase::instance() {
     return instance_;
 }
 
+void AtTransportBase::setActive() {
+    instance_ = this;
+}
+
+bool AtTransportBase::isActive() const {
+    return instance_ == this;
+}
+
 int AtTransportBase::notifyReceivedData(size_t len, unsigned int timeoutMsec) {
     if (direct_) {
+        if (handler_) {
+            handler_(len, handlerCtx_);
+        }
         return 0;
     }
 
