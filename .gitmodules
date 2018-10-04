@@ -1,3 +1,6 @@
 [submodule "third_party/esp32-at"]
 	path = third_party/esp32-at
 	url = ../esp32-at.git
+[submodule "gsm0710muxer/gsm0710muxer"]
+	path = gsm0710muxer/gsm0710muxer
+	url = ../gsm0710muxer.git
