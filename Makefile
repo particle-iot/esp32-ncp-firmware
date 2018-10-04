@@ -9,6 +9,7 @@ THIRD_PARTY_DIR := $(PROJECT_DIR)/third_party
 # esp32-at components
 export ESP_AT_PROJECT_PATH := $(THIRD_PARTY_DIR)/esp32-at
 EXTRA_COMPONENT_DIRS := $(THIRD_PARTY_DIR)/esp32-at/components
+EXTRA_COMPONENT_DIRS += $(PROJECT_DIR)/gsm0710muxer
 
 export IDF_PATH ?= $(ESP_AT_PROJECT_PATH)/esp-idf
 
