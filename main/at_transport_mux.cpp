@@ -128,7 +128,7 @@ int AtMuxTransport::writeData(const uint8_t* data, size_t len) {
         return -1;
     }
 
-    CHECK(muxer_.writeChannel(1, data, len));
+    CHECK(muxer_.writeChannel(MUX_CHANNEL_AT, data, len));
     return len;
 }
 
