@@ -25,14 +25,16 @@ install:
   - mkdir -p ~/esp
   - cd ~/esp
   # Download binary toolchain for the ESP32
-  - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz
-  - tar -xzf xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz
+  - wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
+  - tar -xzf xtensa-esp32-elf-linux64-1.22.0-80-g6c4433a-5.2.0.tar.gz
   # Make xtensa-esp32-elf available for all terminal sessions
   - export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin
 
 script:
   # Go back to the git repository
   - cd $PROJECT_PATH
+  # Install python dependencies
+  - pip install --user -r third_party/esp32-at/esp-idf/requirements.txt
   # Update configuration so that kconfig doesn't start interactive mode
   - make defconfig
   # Build project from the git repository

@@ -35,7 +35,7 @@ int AtUartTransport::initTransport()  {
     CHECK_ESP(uart_set_pin(conf_.uart, conf_.txPin, conf_.rxPin, conf_.rtsPin, conf_.ctsPin));
     CHECK_ESP(uart_driver_install(conf_.uart, 2048, 2048, 30, &queue_, 0));
 
-    if (xTaskCreate(run, "at_uart_t", 2048, this, tskIDLE_PRIORITY + 1, &thread_) != pdPASS) {
+    if (xTaskCreate(run, "at_uart_t", 8192, this, tskIDLE_PRIORITY + 1, &thread_) != pdPASS) {
         destroyTransport();
     }
 
