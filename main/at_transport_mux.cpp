@@ -52,6 +52,7 @@ int outputEthernetPacket(tcpip_adapter_if_t iface, const uint8_t* data, size_t l
 }
 
 const auto MUXER_MAX_FRAME_SIZE = 1536;
+const auto MUXER_MAX_WRITE_TIMEOUT = 10000; // ms
 
 } // anonymous
 
@@ -128,7 +129,9 @@ int AtMuxTransport::writeData(const uint8_t* data, size_t len) {
         return -1;
     }
 
-    CHECK(muxer_.writeChannel(MUX_CHANNEL_AT, data, len));
+    // Note: waiting up to MUXER_MAX_WRITE_TIMEOUT seconds here if the remote
+    // end is not ready to receive data (~RTS)
+    CHECK(muxer_.writeChannel(MUX_CHANNEL_AT, data, len, MUXER_MAX_WRITE_TIMEOUT));
     return len;
 }
 
