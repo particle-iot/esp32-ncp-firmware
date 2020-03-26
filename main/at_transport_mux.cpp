@@ -19,6 +19,7 @@
 #include "at_transport_uart.h"
 #include <lwip/netif.h>
 #include <tcpip_adapter.h>
+#include <tcpip_adapter_internal.h>
 #include <esp_wifi.h>
 #include <esp_wifi_internal.h>
 

@@ -30,6 +30,7 @@
 #include <lwip/pbuf.h>
 #include <lwip/netif.h>
 #include <freertos/queue.h>
+#include "nvs_flash.h"
 
 /* :( */
 extern "C" {
@@ -159,7 +160,8 @@ int networkInitialize() {
 int main() {
     LOG(INFO, "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION_STRING);
 
-    CHECK(nvsInitialize());
+    CHECK(nvs_flash_init());
+    tcpip_adapter_init();
     CHECK(atInitialize());
     CHECK(miscInitialize());
     CHECK(networkInitialize());
@@ -209,4 +211,8 @@ extern "C" bool esp_at_get_wifi_default_config(wifi_init_config_t* config)
 
     memcpy(config, &wifi_cfg, sizeof(wifi_init_config_t));
     return true;
+}
+
+extern "C" uint32_t esp_at_get_task_stack_size(void) {
+    return CONFIG_AT_TASK_STACK_SIZE;
 }
