@@ -59,9 +59,9 @@ const auto MUXER_MAX_WRITE_TIMEOUT = 10000; // ms
 
 namespace particle { namespace ncp {
 
-AtMuxTransport::AtMuxTransport(AtUartTransport* uart)
-        : uart_(uart),
-          stream_((AtTransportBase*)uart),
+AtMuxTransport::AtMuxTransport(AtTransportBase* transport)
+        : transport_(transport),
+          stream_(transport),
           muxer_(&stream_),
           rxBuf_(rxBufData_, sizeof(rxBufData_)),
           started_(false) {
@@ -98,10 +98,10 @@ int AtMuxTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMse
     }
 
     if (isDirectMode() && muxer_.isRunning()) {
-        // XModem is running in a busy-loop in AtUartTransport thread,
+        // XModem is running in a busy-loop in AtUartTransport/ATSdioTransport thread,
         // we have to manually pump the data here, unfortunately.
-        if (uart_->getDataLength() > 0) {
-            muxer_.notifyInput(uart_->getDataLength());
+        if (transport_->getDataLength() > 0) {
+            muxer_.notifyInput(transport_->getDataLength());
         }
         // I have no idea why vTaskDelay is needed here, but without it
         // muxer thread does not get any execution time, despite the fact
@@ -149,7 +149,7 @@ int AtMuxTransport::waitWriteComplete(unsigned int timeoutMsec) {
         return -1;
     }
 
-    return uart_->waitWriteComplete(timeoutMsec);
+    return transport_->waitWriteComplete(timeoutMsec);
 }
 
 Muxer* AtMuxTransport::getMuxer() {
@@ -165,15 +165,15 @@ int AtMuxTransport::startMuxer() {
 }
 
 void AtMuxTransport::setActive() {
-    uart_->setDirectMode(true, dataHandlerCb, this);
+    transport_->setDirectMode(true, dataHandlerCb, this);
     AtTransportBase::setActive();
 }
 
 int AtMuxTransport::stopMuxer() {
     muxer_.stop();
     muxer_.setChannelStateHandler(nullptr, nullptr);
-    uart_->setActive();
-    uart_->setDirectMode(false);
+    transport_->setActive();
+    transport_->setDirectMode(false);
     rxBuf_.reset();
     return 0;
 }

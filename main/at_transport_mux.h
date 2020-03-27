@@ -30,8 +30,6 @@ namespace particle { namespace ncp {
 using MuxerStream = AtTransportStream;
 using Muxer = gsm0710::Muxer<MuxerStream, std::recursive_mutex>;
 
-class AtUartTransport;
-
 enum MuxerChannel {
     MUX_CHANNEL_AT       = 1,
     MUX_CHANNEL_STATION  = 2,
@@ -40,7 +38,7 @@ enum MuxerChannel {
 
 class AtMuxTransport : public AtTransportBase {
 public:
-    AtMuxTransport(AtUartTransport* uart);
+    AtMuxTransport(AtTransportBase* uart);
     virtual ~AtMuxTransport();
 
     virtual void setActive() override;
@@ -78,7 +76,7 @@ private:
     int channelState(uint8_t channel, Muxer::ChannelState oldState, Muxer::ChannelState newState);
 
 private:
-    AtUartTransport* uart_;
+    AtTransportBase* transport_;
 
     MuxerStream stream_;
     Muxer muxer_;
