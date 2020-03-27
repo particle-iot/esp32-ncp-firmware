@@ -20,6 +20,8 @@
 
 namespace particle { namespace ncp {
 
+static const char* TAG = "SDIO-AT";
+
 #define container_of(ptr, type, member) ({      \
     const decltype( ((type *)0)->member ) *__mptr = (const decltype( ((type *)0)->member ) *)ptr; \
     (type *)( (char *)__mptr - ((size_t) &((type *)0)->member) );})
