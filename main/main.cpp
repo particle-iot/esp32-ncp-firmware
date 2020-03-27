@@ -22,6 +22,7 @@
 #include "common.h"
 #include "util.h"
 #include "at_transport_uart.h"
+#include "at_transport_sdio.h"
 #include "at_command_manager.h"
 #include "version.h"
 #include "stream.h"
@@ -31,6 +32,9 @@
 #include <lwip/netif.h>
 #include <freertos/queue.h>
 #include "nvs_flash.h"
+#include "esp_event_loop.h"
+#include "esp_wifi.h"
+#include "platforms.h"
 
 /* :( */
 extern "C" {
@@ -39,6 +43,7 @@ extern "C" {
 
 extern "C" void app_main(void);
 
+#if PLATFORM_ID == PLATFORM_ARGON
 const auto UART_CONF_INSTANCE = UART_NUM_0;
 const auto UART_CONF_TX_PIN = 1;
 const auto UART_CONF_RX_PIN = 3;
@@ -55,6 +60,7 @@ const auto UART_CONF_STOP_BITS = UART_STOP_BITS_1;
 const auto UART_CONF_FLOW_CONTROL = UART_HW_FLOWCTRL_CTS_RTS;
 /* magick number */
 const auto UART_CONF_RX_FLOW_CTRL_THRESH = 122;
+#endif
 
 const auto NETWORK_INPUT_PACKET_QUEUE_SIZE = 20;
 const auto NETWORK_INPUT_PRIORITY = tskIDLE_PRIORITY + 3;
@@ -98,6 +104,7 @@ int ESP_IRAM_ATTR particle_ethernet_input_hook(struct netif* inp, struct pbuf* p
 }
 
 int atInitialize() {
+#if PLATFORM_ID == PLATFORM_ARGON
     /* UART transport configuration */
     AtUartTransport::Config conf = {};
     conf.uart = UART_CONF_INSTANCE;
@@ -116,7 +123,10 @@ int atInitialize() {
     /* Initialize transport first */
     static AtUartTransport transport(conf);
     CHECK(transport.init());
-
+#elif PLATFORM_ID == PLATFORM_TRACKER
+    static AtSdioTransport transport;
+    CHECK(transport.init());
+#endif
     g_muxTransport.reset(new (std::nothrow) AtMuxTransport(&transport));
     CHECK_TRUE(g_muxTransport, RESULT_NO_MEMORY);
     g_muxTransport->init();
@@ -157,11 +167,26 @@ int networkInitialize() {
     return 0;
 }
 
+static esp_err_t at_wifi_event_handler(void *ctx, system_event_t *event) {
+    esp_err_t ret = esp_at_wifi_event_handler(ctx, event);
+    return ret;
+}
+
+static int wifiInitialize(void) {
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    CHECK(esp_event_loop_init(at_wifi_event_handler, NULL));
+    CHECK(esp_wifi_init(&cfg));
+    CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    CHECK(esp_wifi_start());
+    return 0;
+}
+
 int main() {
     LOG(INFO, "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION_STRING);
 
     CHECK(nvs_flash_init());
     tcpip_adapter_init();
+    CHECK(wifiInitialize());
     CHECK(atInitialize());
     CHECK(miscInitialize());
     CHECK(networkInitialize());
