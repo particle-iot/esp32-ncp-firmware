@@ -35,6 +35,7 @@
 #include "esp_event_loop.h"
 #include "esp_wifi.h"
 #include "platforms.h"
+#include "esp_log.h"
 
 /* :( */
 extern "C" {
@@ -182,7 +183,7 @@ static int wifiInitialize(void) {
 }
 
 int main() {
-    LOG(INFO, "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION_STRING);
+    ESP_LOG_LEVEL(ESP_LOG_INFO, "App", "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION_STRING);
 
     CHECK(nvs_flash_init());
     tcpip_adapter_init();
