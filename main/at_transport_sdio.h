@@ -57,6 +57,7 @@ protected:
     virtual int preRestart() override;
 
 private:
+    int fetchData(unsigned int timeoutMsec);
     static void run(void* arg);
     void run();
 

@@ -109,7 +109,35 @@ int AtSdioTransport::postInitTransport() {
     return 0;
 }
 
+int AtSdioTransport::fetchData(unsigned int timeoutMsec) {
+    sdio_slave_buf_handle_t handle;
+    size_t length = 0;
+    uint8_t* ptr = NULL;
+
+    esp_err_t ret = sdio_slave_recv(&handle, &ptr, &length, timeoutMsec / portTICK_PERIOD_MS);
+    if (ret == ESP_OK) {
+        // ESP_LOGI(TAG, "fetchData: recv OK,length:%d, total: %d", length, getDataLength());
+        esp_at_sdio_list_t* p_list = container_of(ptr, esp_at_sdio_list_t, pbuf); // get struct list pointer
+
+        p_list->handle = handle;
+        p_list->left_len = length;
+        p_list->pos = 0;
+        p_list->next = NULL;
+        xSemaphoreTake(semahandle_, portMAX_DELAY);
+        if (!listTail_) {
+            listTail_ = p_list;
+            listHead_ = listTail_;
+        } else {
+            listTail_->next = p_list;
+            listTail_ = p_list;
+        }
+        xSemaphoreGive(semahandle_);
+    }
+    return ret;
+}
+
 int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMsec) {
+    esp_err_t ret;
     uint32_t copy_len = 0;
     if (data == NULL || len < 0) {
         ESP_LOGI(TAG , "Cannot get read data address.");
@@ -121,8 +149,9 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
         return 0;
     }
 
-    if (listHead_ == NULL) {
-        return 0;
+    if (getDataLength() < len) {
+        // ESP_LOGI(TAG, "readData, data is not enough, copy_len:%d, require_len: %d, curr_data_size: %d", copy_len, len, getDataLength());
+        fetchData(timeoutMsec);
     }
 
     while (copy_len < len) {
@@ -130,31 +159,37 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
             break;
         }
 
-        esp_at_sdio_list_t* p_list = listHead_;
+        esp_at_sdio_list_t* tmpHead = listHead_;
 
-        if (len < p_list->left_len) {
-            memcpy(data, p_list->pbuf + p_list->pos, len);
-            p_list->pos += len;
-            p_list->left_len -= len;
+        if (len < tmpHead->left_len) {
+            memcpy(&data[copy_len], tmpHead->pbuf + tmpHead->pos, len);
+            tmpHead->pos += len;
+            tmpHead->left_len -= len;
             copy_len += len;
         } else {
-            memcpy(data, p_list->pbuf + p_list->pos, p_list->left_len);
-            p_list->pos += p_list->left_len;
-            copy_len += p_list->left_len;
-            p_list->left_len = 0;
+            memcpy(&data[copy_len], tmpHead->pbuf + tmpHead->pos, tmpHead->left_len);
+            tmpHead->pos += tmpHead->left_len;
+            copy_len += tmpHead->left_len;
+            tmpHead->left_len = 0;
             xSemaphoreTake(semahandle_, portMAX_DELAY);
-            listHead_ = p_list->next;
-            p_list->next = NULL;
+            listHead_ = tmpHead->next;
+            tmpHead->next = NULL;
 
             if (!listHead_) {
                 listTail_ = NULL;
             }
-
             xSemaphoreGive(semahandle_);
 
-            sdio_slave_recv_load_buf(p_list->handle);
+            ret = sdio_slave_recv_load_buf(tmpHead->handle);
+            assert(ret == ESP_OK);
         }
     }
+
+    // ESP_LOGI(TAG , "SDIO read data, len: %d, copy_len: %d", len, copy_len);
+    // for (int i = 0; i < copy_len; i++) {
+    //     printf("%02x", data[i]);
+    // }
+    // printf("\r\n");
 
     return copy_len;
 }
@@ -185,6 +220,12 @@ int AtSdioTransport::writeData(const uint8_t* data, size_t len) {
         ESP_LOGE(TAG , "sdio slave transmit error, ret : 0x%x\r\n", ret);
         length = 0;
     }
+
+    // ESP_LOGI(TAG , "SDIO write data, size: %d, data: ", len);
+    // for (int i = 0; i < len; i++) {
+    //     printf("%02x", data[i]);
+    // }
+    // printf("\r\n");
 
     free(sendbuf);
     return length;
@@ -233,38 +274,16 @@ void AtSdioTransport::run(void* arg) {
 void AtSdioTransport::run() {
     LOG(INFO, "SDIO transport thread started");
 
-    sdio_slave_buf_handle_t handle;
-    size_t length = 0;
-    uint8_t* ptr = NULL;
-
     while (!exit_) {
         // receive data from SDIO host
-        esp_err_t ret = sdio_slave_recv(&handle, &ptr, &length, portMAX_DELAY);
+        esp_err_t ret = fetchData(portMAX_DELAY);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Recv error,ret:%x", ret);
+            ESP_LOGE(TAG, "run: recv error,ret:%x", ret);
             continue;
         }
 
-        esp_at_sdio_list_t* p_list = container_of(ptr, esp_at_sdio_list_t, pbuf); // get struct list pointer
-
-        p_list->handle = handle;
-        p_list->left_len = length;
-        p_list->pos = 0;
-        p_list->next = NULL;
-        xSemaphoreTake(semahandle_, portMAX_DELAY);
-
-        if (!listTail_) {
-            listTail_ = p_list;
-            listHead_ = listTail_;
-        } else {
-            listTail_->next = p_list;
-            listTail_ = p_list;
-        }
-
-        xSemaphoreGive(semahandle_);
-
         // notify length to AT core
-        esp_at_port_recv_data_notify(length, portMAX_DELAY);
+        notifyReceivedData(getDataLength(), portMAX_DELAY);
     }
 
     LOG(INFO, "SDIO transport thread exiting");
