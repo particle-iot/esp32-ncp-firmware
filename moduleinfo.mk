@@ -44,7 +44,13 @@ END_ADDR=00000000	 # not used
 NCP_ID=21			 # 33 (see hal/src/hRF52840/platform_ncp.h)
 RESERVED2=00		 # not used
 # MODULE_VERSION_LE=0100	 # 0x0001
+ifeq ("$(PLATFORM)","argon")
 PLATFORM_ID=0C00	 # 12 - Argon
+else ifeq ("$(PLATFORM)","tracker")
+PLATFORM_ID=1A00	 # 26 - Tracker
+else
+$(error Unknown platform!)
+endif
 MODULE_FUNCTION=07   # third party mono firmware
 MODULE_INDEX=00		 # not used with mono firmware
 DEPENDENCY=00000000
