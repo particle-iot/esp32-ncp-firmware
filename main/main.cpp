@@ -142,6 +142,8 @@ int atInitialize() {
     CHECK_TRUE(esp_at_base_cmd_regist(), RESULT_ERROR);
     /* WiFi AT commands */
     CHECK_TRUE(esp_at_wifi_cmd_regist(), RESULT_ERROR);
+    /* NET AT commands */
+    CHECK_TRUE(esp_at_net_cmd_regist(), RESULT_ERROR);
 
     CHECK(transport.postInit());
 
