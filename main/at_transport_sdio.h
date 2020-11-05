@@ -19,24 +19,16 @@
 
 #include "at_transport.h"
 #include <atomic>
+#include <mutex>
 #include <driver/sdio_slave.h>
 
 namespace particle { namespace ncp {
 
-static constexpr int ESP_AT_SDIO_BUFFER_SIZE = CONFIG_AT_SDIO_BLOCK_SIZE;
-static constexpr int ESP_AT_SDIO_BUFFER_NUM  = CONFIG_AT_SDIO_BUFFER_NUM;
-static constexpr int ESP_AT_SDIO_QUEUE_SIZE  = CONFIG_AT_SDIO_QUEUE_SIZE;
+constexpr int AT_SDIO_BUFFER_SIZE = CONFIG_AT_SDIO_BLOCK_SIZE;
+constexpr int AT_SDIO_BUFFER_NUM = CONFIG_AT_SDIO_BUFFER_NUM;
+constexpr int AT_SDIO_QUEUE_SIZE = CONFIG_AT_SDIO_QUEUE_SIZE;
 
 class AtSdioTransport : public AtTransportBase {
-
-typedef struct sdio_list {
-    uint8_t                 pbuf[ESP_AT_SDIO_BUFFER_SIZE];
-    struct sdio_list*       next;
-    sdio_slave_buf_handle_t handle;
-    uint32_t                left_len;
-    uint32_t                pos;
-} esp_at_sdio_list_t;
-
 public:
     AtSdioTransport();
     virtual ~AtSdioTransport();
@@ -62,10 +54,21 @@ private:
     void run();
 
 private:
-    esp_at_sdio_list_t WORD_ALIGNED_ATTR list_[ESP_AT_SDIO_BUFFER_NUM];
-    esp_at_sdio_list_t* listHead_;
-    esp_at_sdio_list_t* listTail_;
-    xSemaphoreHandle semahandle_;
+    // Loosely based on esp_at_sdio_list_t
+    struct Buffer {
+        uint8_t pbuf[AT_SDIO_BUFFER_SIZE];
+        struct Buffer* next;
+        sdio_slave_buf_handle_t handle;
+        uint32_t leftLen;
+        uint32_t pos;
+    };
+
+
+    Buffer WORD_ALIGNED_ATTR list_[AT_SDIO_BUFFER_NUM];
+    Buffer* listHead_;
+    Buffer* listTail_;
+    std::mutex mutex_;
+    std::atomic<size_t> rxData_;
 
     std::atomic_bool started_;
     std::atomic_bool exit_;

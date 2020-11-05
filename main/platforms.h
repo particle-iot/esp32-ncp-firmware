@@ -17,19 +17,5 @@
 
 #pragma once
 
-#define PLATFORM_GCC                        3
-#define PLATFORM_PHOTON_DEV                 4
-#define PLATFORM_TEACUP_PIGTAIL_DEV         5
-#define PLATFORM_PHOTON_PRODUCTION          6
-#define PLATFORM_TEACUP_PIGTAIL_PRODUCTION  7
-#define PLATFORM_P1                         8
-#define PLATFORM_ETHERNET_PROTO             9
-#define PLATFORM_ELECTRON_PRODUCTION        10
 #define PLATFORM_ARGON                      12
-#define PLATFORM_BORON                      13
-#define PLATFORM_XENON                      14
-#define PLATFORM_ASOM                       22
-#define PLATFORM_BSOM                       23
-#define PLATFORM_B5SOM                      25
 #define PLATFORM_TRACKER                    26
-#define PLATFORM_NEWHAL                     60000

@@ -1,7 +1,7 @@
 include version.mk
 include platform.mk
 
-PROJECT_NAME := esp-at-$(PLATFORM)-$(FIRMWARE_VERSION)
+PROJECT_NAME := $(PLATFORM)-esp32-ncp
 export ESP_AT_PROJECT_PLATFORM ?= PLATFORM_ESP32
 
 # Generate sdkconfig
@@ -50,7 +50,7 @@ else
 SDKCONFIG_DEFAULTS := $(ESP_AT_MODULE_CONFIG_DIR)/sdkconfig.defaults
 endif
 
-export PROJECT_VER = "ESP-AT"
+export PROJECT_VER = $(FIRMWARE_VERSION)
 
 ifeq ("$(filter 3.81 3.82,$(MAKE_VERSION))","") ## IDF just support 3.81,3.82 or 4.x newer
 include $(IDF_PATH)/make/project.mk
@@ -69,6 +69,10 @@ endif
 endif
 
 include moduleinfo.mk
+
+# Override standard all and clean target
+all: all_binaries module | check_python_dependencies
+clean: app-clean bootloader-clean config-clean ldgen-clean module-clean
 
 CXXFLAGS += -std=c++14 -Wall -Werror
 

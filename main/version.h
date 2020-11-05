@@ -24,7 +24,7 @@ namespace particle {
 #define xstr(x) str(x)
 #define str(x) #x
 
-const char* const FIRMWARE_VERSION_STRING = xstr(ARGON_FIRMWARE_VERSION);
-const uint16_t FIRMWARE_MODULE_VERSION = ARGON_FIRMWARE_MODULE_VERSION;
+const char* const FIRMWARE_VERSION_STRING = xstr(ESP32_NCP_FIRMWARE_VERSION);
+const uint16_t FIRMWARE_MODULE_VERSION = ESP32_NCP_FIRMWARE_MODULE_VERSION;
 
 } // particle

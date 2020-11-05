@@ -103,6 +103,11 @@ public:
         return at_->writeData((const uint8_t*)data, size);
     }
 
+    int waitEvent(unsigned flags, unsigned timeout) override {
+        // FIXME: not implemented
+        return 0;
+    }
+
 private:
     AtTransportBase* at_;
 };

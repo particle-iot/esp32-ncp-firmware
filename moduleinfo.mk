@@ -33,7 +33,7 @@ endif
 
 OUT=build/$(PROJECT_NAME)
 BIN=$(OUT).bin
-MODULE=$(OUT).module
+MODULE=$(OUT)@$(FIRMWARE_VERSION).bin
 PREFIX=$(OUT).prefix
 SUFFIX=$(OUT).suffix
 CP=cp
@@ -83,6 +83,9 @@ suffix:
 	cat $(PREFIX) $(BIN) $(SUFFIX) > $(MODULE)
 	$(CRC) $(MODULE) | cut -c 1-10 | $(XXD) -r -p | dd bs=1 of=$(SUFFIX) seek=36 conv=notrunc $(VERBOSE_REDIRECT)
 
-module: all prefix suffix
+module: prefix suffix
 	$(call echo,"Making module from binary")
 	cat $(PREFIX) $(BIN) $(SUFFIX) > $(MODULE)
+
+module-clean:
+	rm -f $(MODULE)

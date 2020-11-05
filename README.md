@@ -1,6 +1,6 @@
-# Argon NCP (ESP32) firmware
+# ESP32 NCP firmware
 
-The firmware for Argon NCP (ESP32).
+The firmware for ESP32 NCP present on Argon and Tracker.
 
 ## Prerequisites
 
@@ -14,12 +14,25 @@ After pulling changes from the repo, run
 git submodule update --init --recursive
 ```
 
-## Building and flashing the application
+## Specifying the platform
+
+Platform name needs to be passed as make argument, e.g.:
 
 ```
-$ make
-$ make flash
+$ make PLATFORM=argon
 ```
+
+Support platform names: `tracker`, `argon`.
+
+## Building
+
+```
+$ make PLATFORM=argon
+```
+
+The resulting binaries can be found in `build` directory:
+- Raw binary files are named: `argon-esp32-ncp.bin` / `tracker-esp32-ncp.bin`
+- Modules (that can be flashed OTA or with YModem) contain the version in their name: `argon-esp32-ncp@0.0.6.bin` / `tracker-esp32-ncp@0.0.6.bin`
 
 ## Building the factory image
 
@@ -27,13 +40,7 @@ $ make flash
 $ make factory_bin
 ```
 
-The combined 4MB factory binary will be written to `build/factory.bin`.
-
-## Building modular firmware for flashing via BLE/OTA/Ymodem in Device OS
-
-```
-$make module
-```
+The combined factory binary spanning the whole ESP32 flash will be written to `build/${PLATFORM}-esp32-ncp-factory@${VERSION}.bin`.
 
 ## Updating the version information
 

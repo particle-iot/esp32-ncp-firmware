@@ -174,6 +174,7 @@ static esp_err_t at_wifi_event_handler(void *ctx, system_event_t *event) {
 }
 
 static int wifiInitialize(void) {
+    tcpip_adapter_init();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     CHECK(esp_event_loop_init(at_wifi_event_handler, NULL));
     CHECK(esp_wifi_init(&cfg));
@@ -183,10 +184,9 @@ static int wifiInitialize(void) {
 }
 
 int main() {
-    ESP_LOG_LEVEL(ESP_LOG_INFO, "App", "Starting Argon NCP firmware version: %s", FIRMWARE_VERSION_STRING);
+    ESP_LOG_LEVEL(ESP_LOG_INFO, "App", "Starting ESP32 NCP firmware version: %s", FIRMWARE_VERSION_STRING);
 
     CHECK(nvs_flash_init());
-    tcpip_adapter_init();
     CHECK(wifiInitialize());
     CHECK(atInitialize());
     CHECK(miscInitialize());
@@ -198,7 +198,7 @@ int main() {
 }
 
 void app_main(void) {
-    main();
+    assert(main() == 0);
 
     vTaskPrioritySet(nullptr, NETWORK_INPUT_PRIORITY);
 
