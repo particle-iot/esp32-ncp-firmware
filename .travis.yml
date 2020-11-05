@@ -36,11 +36,14 @@ script:
   # Install python dependencies
   - pip install --user -r third_party/esp32-at/esp-idf/requirements.txt
   # Update configuration so that kconfig doesn't start interactive mode
-  - make defconfig
+  # - make defconfig
   # Build project from the git repository
-  - make
-  - make module
-  - make factory_bin
+  - make PLATFORM=tracker clean
+  - make PLATFORM=tracker all
+  - make PLATFORM=tracker factory_bin
+  - make PLATFORM=argon clean
+  - make PLATFORM=argon all
+  - make PLATFORM=argon factory_bin
 
 notifications:
   slack: s:uyDgDeY2Sric20NcE50P11QS
