@@ -182,17 +182,19 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
 
         if (buf->leftLen == 0) {
             // Can be given back
-            std::lock_guard<std::mutex> lock(mutex_);
-            listHead_ = buf->next;
-            buf->next = nullptr;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                listHead_ = buf->next;
+                buf->next = nullptr;
 
-            if (!listHead_) {
-                listTail_ = nullptr;
+                if (!listHead_) {
+                    listTail_ = nullptr;
+                }
             }
-        }
 
-        auto ret = sdio_slave_recv_load_buf(buf->handle);
-        assert(ret == ESP_OK);
+            auto ret = sdio_slave_recv_load_buf(buf->handle);
+            assert(ret == ESP_OK);
+        }
     }
 
     rxData_ -= pos;
@@ -210,7 +212,8 @@ int AtSdioTransport::writeData(const uint8_t* data, size_t len) {
     }
 
     esp_err_t ret = ESP_FAIL;
-    if (!esp_ptr_dma_capable(data)) {
+    // Buffer should be in RAM/flash that can be used for DMA and 32-bit aligned
+    if (!esp_ptr_dma_capable(data) || (reinterpret_cast<uintptr_t>(data) % 4) != 0) {
         // Cannot DMA directly, allocate a temporary buffer
         auto buf = (uint8_t*)heap_caps_malloc(len, MALLOC_CAP_DMA);
         if (buf == nullptr) {
@@ -220,6 +223,7 @@ int AtSdioTransport::writeData(const uint8_t* data, size_t len) {
         ret = sdio_slave_transmit(buf, len);
         free(buf);
     } else {
+        // We are lucky and we can use the buffer as-is
         ret = sdio_slave_transmit((uint8_t*)data, len);
     }
 
