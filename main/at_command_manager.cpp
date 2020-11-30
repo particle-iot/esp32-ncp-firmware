@@ -229,6 +229,8 @@ int AtCommandManager::init() {
             int ret = 0;
             do {
                 ret = xmodem.run();
+                // Otherwise task watchdog gets triggered
+                vTaskDelay(1);
             } while (ret == XmodemReceiver::RUNNING);
             // Discard any extra CAN bytes that might have been sent by the sender at the end of
             // the XModem transfer
