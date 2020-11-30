@@ -194,6 +194,9 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
 
             auto ret = sdio_slave_recv_load_buf(buf->handle);
             assert(ret == ESP_OK);
+
+            // Make sure to notify the host that we have a new buffer available
+            sdio_slave_send_host_int(SDIO_SLAVE_HOSTINT_BIT0);
         }
     }
 
