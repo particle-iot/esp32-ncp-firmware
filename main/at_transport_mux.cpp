@@ -101,17 +101,17 @@ int AtMuxTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMse
         // XModem is running in a busy-loop in AtUartTransport/ATSdioTransport thread,
         // we have to manually pump the data here, unfortunately.
         if (transport_->getDataLength() > 0) {
-            muxer_.notifyInput(transport_->getDataLength());
+            CHECK(muxer_.notifyInput(transport_->getDataLength()));
         }
         // I have no idea why vTaskDelay is needed here, but without it
         // muxer thread does not get any execution time, despite the fact
         // that we've just supposedly unblocked it in notifyInput()
-        vTaskDelay(1);
+        vTaskDelay(1 / portTICK_PERIOD_MS);
     }
 
     const ssize_t canRead = CHECK(rxBuf_.data());
-
     const ssize_t willRead = std::min(len, canRead);
+
     if (willRead == 0) {
         return 0;
     }

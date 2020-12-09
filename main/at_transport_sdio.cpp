@@ -42,6 +42,7 @@
 
 #include "at_transport_sdio.h"
 #include "logging.h"
+#include "util.h"
 
 namespace particle { namespace ncp {
 
@@ -49,13 +50,22 @@ namespace particle { namespace ncp {
     const decltype( ((type *)0)->member ) *__mptr = (const decltype( ((type *)0)->member ) *)ptr; \
     (type *)( (char *)__mptr - ((size_t) &((type *)0)->member) );})
 
+namespace {
+
+const auto AT_SDIO_WAKE_UP_PERIOD_MS = 1000;
+
+} // anonymous
+
 AtSdioTransport::AtSdioTransport()
         : AtTransportBase(),
           listHead_(nullptr),
           listTail_(nullptr),
           started_(false),
           exit_(false),
-          thread_(nullptr) {
+          rxThread_(nullptr),
+          txThread_(nullptr),
+          txBuf_(txBufData_, sizeof(txBufData_)),
+          transmitting_(false) {
 }
 
 AtSdioTransport::~AtSdioTransport() {
@@ -74,6 +84,9 @@ int AtSdioTransport::initTransport()  {
     assert(ret == ESP_OK);
 
     rxData_ = 0;
+    transmitting_ = false;
+    txBuf_.reset();
+    exit_ = 0;
 
     for (int loop = 0; loop < AT_SDIO_BUFFER_NUM; loop++) {
         handle = sdio_slave_recv_register_buf(list_[loop].pbuf);
@@ -87,7 +100,22 @@ int AtSdioTransport::initTransport()  {
 
     sdio_slave_start();
 
-    if (xTaskCreate(run, "at_sdio_t", 8192, this, tskIDLE_PRIORITY + 1, &thread_) != pdPASS) {
+    // FIXME: we have to start two threads unfortunately since it's impossible to wait for both
+    // rx and tx events and the same. In order to avoid busy loop, we'll sacrifice 4k of stack here
+    // and having to run an extra thread.
+    if (xTaskCreate([](void* arg) -> void {
+                auto self = static_cast<AtSdioTransport*>(arg);
+                self->rxRun();
+                vTaskDelete(nullptr);
+            }, "at_sdio_rx_t", 4096, this, tskIDLE_PRIORITY + 8, &rxThread_) != pdPASS) {
+        destroyTransport();
+    }
+
+    if (xTaskCreate([](void* arg) -> void {
+                auto self = static_cast<AtSdioTransport*>(arg);
+                self->txRun();
+                vTaskDelete(nullptr);
+            }, "at_sdio_tx_t", 4096, this, tskIDLE_PRIORITY + 8, &txThread_) != pdPASS) {
         destroyTransport();
     }
 
@@ -98,19 +126,20 @@ int AtSdioTransport::initTransport()  {
 
 int AtSdioTransport::destroyTransport() {
     LOG(INFO, "Deinitializing SDIO transport");
-    if (thread_) {
-        exit_ = true;
+    if (rxThread_ || txThread_) {
+        exit_ = (rxThread_ != nullptr) + (txThread_ != nullptr);
 
-        LOG(INFO, "Waiting for SDIO thread to stop");
+        LOG(INFO, "Waiting for SDIO threads to stop");
 
         /* Join thread */
         while (exit_) {
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
 
-        thread_ = nullptr;
+        rxThread_ = nullptr;
+        txThread_ = nullptr;
 
-        LOG(INFO, "SDIO thread stopped");
+        LOG(INFO, "SDIO threads stopped");
     }
 
     waitWriteComplete(portMAX_DELAY);
@@ -134,7 +163,11 @@ int AtSdioTransport::fetchData(unsigned int timeoutMsec) {
     size_t length = 0;
     uint8_t* ptr = nullptr;
 
-    CHECK_ESP(sdio_slave_recv(&handle, &ptr, &length, timeoutMsec / portTICK_PERIOD_MS));
+    auto ret = sdio_slave_recv(&handle, &ptr, &length, timeoutMsec / portTICK_PERIOD_MS);
+    if (ret == ESP_ERR_TIMEOUT) {
+        return RESULT_TIMEOUT;
+    }
+    CHECK_ESP(ret);
     Buffer* buf = container_of(ptr, Buffer, pbuf); // get struct list pointer
 
     buf->handle = handle;
@@ -142,7 +175,7 @@ int AtSdioTransport::fetchData(unsigned int timeoutMsec) {
     buf->pos = 0;
     buf->next = nullptr;
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(rxMutex_);
     if (!listTail_) {
         listTail_ = buf;
         listHead_ = listTail_;
@@ -166,7 +199,7 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
     size_t toRead = len;
     size_t pos = 0;
     while (toRead > 0) {
-        auto buf = listHead_;
+        Buffer* buf = (Buffer*)(listHead_);
 
         // We don't have any more data
         if (!buf) {
@@ -183,7 +216,7 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
         if (buf->leftLen == 0) {
             // Can be given back
             {
-                std::lock_guard<std::mutex> lock(mutex_);
+                std::lock_guard<std::mutex> lock(rxMutex_);
                 listHead_ = buf->next;
                 buf->next = nullptr;
 
@@ -196,7 +229,7 @@ int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMs
             assert(ret == ESP_OK);
 
             // Make sure to notify the host that we have a new buffer available
-            sdio_slave_send_host_int(SDIO_SLAVE_HOSTINT_BIT0);
+            sdio_slave_send_host_int(HOST_SLC0_TOHOST_BIT0_INT_ENA_S);
         }
     }
 
@@ -214,23 +247,71 @@ int AtSdioTransport::writeData(const uint8_t* data, size_t len) {
         return -1;
     }
 
-    esp_err_t ret = ESP_FAIL;
-    // Buffer should be in RAM/flash that can be used for DMA and 32-bit aligned
-    if (!esp_ptr_dma_capable(data) || (reinterpret_cast<uintptr_t>(data) % 4) != 0) {
-        // Cannot DMA directly, allocate a temporary buffer
-        auto buf = (uint8_t*)heap_caps_malloc(len, MALLOC_CAP_DMA);
-        if (buf == nullptr) {
-            return -1;
-        }
-        memcpy(buf, data, len);
-        ret = sdio_slave_transmit(buf, len);
-        free(buf);
-    } else {
-        // We are lucky and we can use the buffer as-is
-        ret = sdio_slave_transmit((uint8_t*)data, len);
+    std::lock_guard<std::recursive_mutex> lock(txMutex_);
+    const size_t canWrite = CHECK(txBuf_.space());
+    const size_t willWrite = std::min(canWrite, len);
+
+    if (willWrite > 0) {
+        CHECK(txBuf_.put(data, willWrite));
     }
 
-    return (ret == ESP_OK) ? len : -1;
+    CHECK(startTransmission());
+
+    return willWrite;
+}
+
+int AtSdioTransport::startTransmission() {
+    std::lock_guard<std::recursive_mutex> lock(txMutex_);
+    size_t consumable = std::min<size_t>(txBuf_.consumable(), CONFIG_AT_SDIO_BLOCK_SIZE);
+    if (transmitting_ || consumable == 0) {
+        return 0;
+    }
+
+    size_t align = (consumable % 4);
+    if (align) {
+        align = sizeof(uint32_t) - align;
+
+        if (txBuf_.space() < align) {
+            return RESULT_NO_MEMORY;
+        }
+
+        // Dummy write to enforce alignment
+        CHECK(txBuf_.put(nullptr, align));
+        consumable = txBuf_.consumable();
+    }
+
+    if (consumable % 4 != 0) {
+        return RESULT_ERROR;
+    }
+
+    auto ptr = txBuf_.consume(consumable);
+    assert(esp_ptr_dma_capable(ptr));
+
+    esp_err_t ret = sdio_slave_send_queue((uint8_t*)ptr, consumable - align, (void*)consumable, 0);
+    if (ret != ESP_OK) {
+        // Cancel
+        txBuf_.consumeCommit(0, consumable);
+    }
+    CHECK_ESP(ret);
+
+    transmitting_ = true;
+
+    return 0;
+}
+
+int AtSdioTransport::waitTransmissionFinished(unsigned int timeoutMsec) {
+    size_t consume = 0;
+    auto ret = sdio_slave_send_get_finished((void**)&consume, timeoutMsec / portTICK_PERIOD_MS);
+    if (ret == ESP_ERR_TIMEOUT) {
+        return RESULT_TIMEOUT;
+    }
+    CHECK_ESP(ret);
+    {
+        std::lock_guard<std::recursive_mutex> lock(txMutex_);
+        txBuf_.consumeCommit(consume);
+        transmitting_ = false;
+    }
+    return 0;
 }
 
 int AtSdioTransport::getDataLength() const {
@@ -238,7 +319,20 @@ int AtSdioTransport::getDataLength() const {
 }
 
 int AtSdioTransport::waitWriteComplete(unsigned int timeoutMsec) {
-    return 0;
+    // FIXME: busy-ish loop
+    auto start = util::millis();
+    while (util::millis() - start < timeoutMsec) {
+        while(transmitting_) {
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+        {
+            std::lock_guard<std::recursive_mutex> lock(txMutex_);
+            if (txBuf_.empty()) {
+                return 0;
+            }
+        }
+    }
+    return RESULT_TIMEOUT;
 }
 
 int AtSdioTransport::statusChanged(esp_at_status_type status) {
@@ -254,29 +348,43 @@ int AtSdioTransport::preRestart() {
     return destroyTransport();
 }
 
-void AtSdioTransport::run(void* arg) {
-    auto self = static_cast<AtSdioTransport*>(arg);
-    self->run();
-    vTaskDelete(nullptr);
-}
-
-void AtSdioTransport::run() {
-    LOG(INFO, "SDIO transport thread started");
+void AtSdioTransport::rxRun() {
+    LOG(INFO, "SDIO transport RX thread started");
 
     while (!exit_) {
         // receive data from SDIO host
-        auto ret = fetchData(portMAX_DELAY);
+        auto ret = fetchData(AT_SDIO_WAKE_UP_PERIOD_MS);
 
         // notify length to AT core
         if (ret > 0) {
             rxData_ += ret;
-            notifyReceivedData(ret, portMAX_DELAY);
+            notifyReceivedData(ret, AT_SDIO_WAKE_UP_PERIOD_MS);
         }
     }
 
-    LOG(INFO, "SDIO transport thread exiting");
+    LOG(INFO, "SDIO transport RX thread exiting");
 
-    exit_ = false;
+    exit_--;
+}
+
+void AtSdioTransport::txRun() {
+    LOG(INFO, "SDIO transport TX thread started");
+
+    while (!exit_) {
+        if (!waitTransmissionFinished(AT_SDIO_WAKE_UP_PERIOD_MS)) {
+            startTransmission();
+        }
+    }
+
+    LOG(INFO, "SDIO transport TX thread exiting");
+
+    // Just in case
+    {
+        std::lock_guard<std::recursive_mutex> lock(txMutex_);
+        txBuf_.reset();
+        transmitting_ = false;
+    }
+    exit_--;
 }
 
 } } /* particle::ncp */

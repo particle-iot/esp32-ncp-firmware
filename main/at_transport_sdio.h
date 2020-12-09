@@ -20,6 +20,7 @@
 #include "at_transport.h"
 #include <atomic>
 #include <mutex>
+#include "util/ringbuffer.h"
 #include <driver/sdio_slave.h>
 
 namespace particle { namespace ncp {
@@ -27,6 +28,7 @@ namespace particle { namespace ncp {
 constexpr int AT_SDIO_BUFFER_SIZE = CONFIG_AT_SDIO_BLOCK_SIZE;
 constexpr int AT_SDIO_BUFFER_NUM = CONFIG_AT_SDIO_BUFFER_NUM;
 constexpr int AT_SDIO_QUEUE_SIZE = CONFIG_AT_SDIO_QUEUE_SIZE;
+constexpr int AT_SDIO_TX_BUFFER_SIZE = CONFIG_AT_SDIO_BLOCK_SIZE * CONFIG_AT_SDIO_BUFFER_NUM;
 
 class AtSdioTransport : public AtTransportBase {
 public:
@@ -50,8 +52,12 @@ protected:
 
 private:
     int fetchData(unsigned int timeoutMsec);
-    static void run(void* arg);
-    void run();
+    void rxRun();
+    void txRun();
+
+    int startTransmission();
+    int waitTransmissionFinished(unsigned int timeoutMsec);
+
 
 private:
     // Loosely based on esp_at_sdio_list_t
@@ -65,14 +71,20 @@ private:
 
 
     Buffer WORD_ALIGNED_ATTR list_[AT_SDIO_BUFFER_NUM];
-    Buffer* listHead_;
+    volatile Buffer* listHead_;
     Buffer* listTail_;
-    std::mutex mutex_;
+    std::mutex rxMutex_;
+    std::recursive_mutex txMutex_;
     std::atomic<size_t> rxData_;
 
     std::atomic_bool started_;
-    std::atomic_bool exit_;
-    TaskHandle_t thread_;
+    std::atomic_int exit_;
+    TaskHandle_t rxThread_;
+    TaskHandle_t txThread_;
+
+    particle::services::RingBuffer<uint8_t> txBuf_;
+    uint8_t txBufData_[AT_SDIO_TX_BUFFER_SIZE] __attribute__((aligned(4)));
+    volatile bool transmitting_;
 };
 
 } } /* particle::ncp */

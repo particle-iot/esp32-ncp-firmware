@@ -32,7 +32,7 @@ inline uint64_t getMillis() {
 }
 
 const auto taskStackSize = 4096;
-const auto taskPriority = tskIDLE_PRIORITY + 2;
+const auto taskPriority = tskIDLE_PRIORITY + 7;
 
 #define GSM0710_ASSERT(x) assert(x)
 
