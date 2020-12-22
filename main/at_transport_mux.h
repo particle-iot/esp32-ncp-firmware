@@ -38,7 +38,7 @@ enum MuxerChannel {
 
 class AtMuxTransport : public AtTransportBase {
 public:
-    AtMuxTransport(AtTransportBase* uart);
+    AtMuxTransport(AtTransportBase* transport);
     virtual ~AtMuxTransport();
 
     virtual void setActive() override;

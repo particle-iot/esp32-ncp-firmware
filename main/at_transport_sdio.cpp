@@ -189,7 +189,7 @@ int AtSdioTransport::fetchData(unsigned int timeoutMsec) {
 
 int AtSdioTransport::readData(uint8_t* data, ssize_t len, unsigned int timeoutMsec) {
     if (data == nullptr || len < 0) {
-        return -1;
+        return RESULT_ERROR;
     }
 
     if (len == 0) {
@@ -244,7 +244,7 @@ int AtSdioTransport::flushInput() {
 
 int AtSdioTransport::writeData(const uint8_t* data, size_t len) {
     if (len <= 0 || data == nullptr) {
-        return -1;
+        return RESULT_ERROR;
     }
 
     std::lock_guard<std::recursive_mutex> lock(txMutex_);

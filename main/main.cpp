@@ -169,8 +169,7 @@ int networkInitialize() {
 }
 
 static esp_err_t at_wifi_event_handler(void *ctx, system_event_t *event) {
-    esp_err_t ret = esp_at_wifi_event_handler(ctx, event);
-    return ret;
+    return esp_at_wifi_event_handler(ctx, event);
 }
 
 static int wifiInitialize(void) {
