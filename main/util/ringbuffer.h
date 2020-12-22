@@ -148,7 +148,7 @@ inline ssize_t RingBuffer<T>::put(const T& v) {
 
 template <typename T>
 inline ssize_t RingBuffer<T>::put(const T* v, size_t size) {
-    CHECK_TRUE(v && size, RESULT_INVALID_PARAM);
+    CHECK_TRUE(size, RESULT_INVALID_PARAM);
     CHECK_TRUE(space() >= (ssize_t)size, RESULT_TOO_LARGE_DATA);
 
     size_t head = head_;

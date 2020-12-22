@@ -41,6 +41,13 @@ public:
 class Stream:
         virtual public InputStream,
         virtual public OutputStream {
+public:
+    enum EventFlag {
+        READABLE = 0x01,
+        WRITABLE = 0x02
+    };
+
+    virtual int waitEvent(unsigned flags, unsigned timeout = 0) = 0;
 };
 
 } // particle

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Particle Industries, Inc.  All rights reserved.
+ * Copyright (c) 2020 Particle Industries, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,14 +17,5 @@
 
 #pragma once
 
-#include "common.h"
-
-namespace particle {
-
-#define xstr(x) str(x)
-#define str(x) #x
-
-const char* const FIRMWARE_VERSION_STRING = xstr(ESP32_NCP_FIRMWARE_VERSION);
-const uint16_t FIRMWARE_MODULE_VERSION = ESP32_NCP_FIRMWARE_MODULE_VERSION;
-
-} // particle
+#define PLATFORM_ARGON                      12
+#define PLATFORM_TRACKER                    26

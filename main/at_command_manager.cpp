@@ -229,6 +229,13 @@ int AtCommandManager::init() {
             int ret = 0;
             do {
                 ret = xmodem.run();
+                // FIXME: XModem receiver runs in a busy loop and for some reason
+                // under some conditions doesn't allow any other even higher priority
+                // threads to be scheduled. Most likely this is some kind of an issue
+                // with priority inheritance. As a temporary workaround, we'll just
+                // add a 1 tick delay here which should guarantee that other threads
+                // get CPU time.
+                vTaskDelay(1 / portTICK_PERIOD_MS);
             } while (ret == XmodemReceiver::RUNNING);
             // Discard any extra CAN bytes that might have been sent by the sender at the end of
             // the XModem transfer
