@@ -23,6 +23,7 @@
 #include <freertos/event_groups.h>
 #include "common.h"
 #include "util.h"
+#include "platforms.h"
 
 namespace gsm0710 {
 namespace portable {
@@ -32,7 +33,13 @@ inline uint64_t getMillis() {
 }
 
 const auto taskStackSize = 4096;
+#if PLATFORM_ID == PLATFORM_ARGON
+const auto taskPriority = tskIDLE_PRIORITY + 2;
+#elif PLATFORM_ID == PLATFORM_TRACKER
 const auto taskPriority = tskIDLE_PRIORITY + 7;
+#else
+#error "UNKOWN PLATFORM!"
+#endif
 
 #define GSM0710_ASSERT(x) assert(x)
 
