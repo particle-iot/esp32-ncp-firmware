@@ -24,6 +24,14 @@ $ make PLATFORM=argon
 
 Support platform names: `tracker`, `argon`.
 
+## Load default configuration for the platform
+
+This step MUST be done befor building the firmware
+
+```
+$ make PLATFORM=argon defconfig
+```
+
 ## Building
 
 ```
@@ -32,12 +40,12 @@ $ make PLATFORM=argon
 
 The resulting binaries can be found in `build` directory:
 - Raw binary files are named: `argon-esp32-ncp.bin` / `tracker-esp32-ncp.bin`
-- Modules (that can be flashed OTA or with YModem) contain the version in their name: `argon-esp32-ncp@0.0.6.bin` / `tracker-esp32-ncp@0.0.6.bin`
+- Modules (that can be flashed OTA or with YModem) contain the version in their name: `argon-esp32-ncp@0.0.8.bin` / `tracker-esp32-ncp@0.0.8.bin`
 
 ## Building the factory image
 
 ```
-$ make factory_bin
+$ make PLATFORM=argon factory_bin
 ```
 
 The combined factory binary spanning the whole ESP32 flash will be written to `build/${PLATFORM}-esp32-ncp-factory@${VERSION}.bin`.
