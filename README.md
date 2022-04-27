@@ -26,7 +26,7 @@ Support platform names: `tracker`, `argon`.
 
 ## Load default configuration for the platform
 
-This step MUST be done befor building the firmware
+This step MUST be done before building the firmware
 
 ```
 $ make PLATFORM=argon defconfig
