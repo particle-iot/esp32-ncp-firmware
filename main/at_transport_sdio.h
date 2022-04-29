@@ -22,6 +22,9 @@
 #include <mutex>
 #include "util/ringbuffer.h"
 #include <driver/sdio_slave.h>
+#include "platforms.h"
+
+#if PLATFORM_ID == PLATFORM_TRACKER
 
 namespace particle { namespace ncp {
 
@@ -88,3 +91,5 @@ private:
 };
 
 } } /* particle::ncp */
+
+#endif // PLATFORM_ID == PLATFORM_TRACKER

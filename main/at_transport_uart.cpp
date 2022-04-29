@@ -16,6 +16,15 @@
  */
 
 #include "at_transport_uart.h"
+#include "platforms.h"
+
+#if PLATFORM_ID == PLATFORM_ARGON
+#define AT_UART_THREAD_PRIORITY    (tskIDLE_PRIORITY + 1)
+#elif PLATFORM_ID == PLATFORM_TRACKER
+#define AT_UART_THREAD_PRIORITY    (tskIDLE_PRIORITY + 8)
+#else
+#error "UNKOWN PLATFORM!"
+#endif
 
 namespace particle { namespace ncp {
 
@@ -35,7 +44,7 @@ int AtUartTransport::initTransport()  {
     CHECK_ESP(uart_set_pin(conf_.uart, conf_.txPin, conf_.rxPin, conf_.rtsPin, conf_.ctsPin));
     CHECK_ESP(uart_driver_install(conf_.uart, 2048, 2048, 30, &queue_, 0));
 
-    if (xTaskCreate(run, "at_uart_t", 8192, this, tskIDLE_PRIORITY + 8, &thread_) != pdPASS) {
+    if (xTaskCreate(run, "at_uart_t", 8192, this, AT_UART_THREAD_PRIORITY, &thread_) != pdPASS) {
         destroyTransport();
     }
 

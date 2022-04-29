@@ -21,8 +21,6 @@
 #include <freertos/task.h>
 #include "common.h"
 #include "util.h"
-#include "at_transport_uart.h"
-#include "at_transport_sdio.h"
 #include "at_command_manager.h"
 #include "version.h"
 #include "stream.h"
@@ -41,6 +39,14 @@
 extern "C" {
 #include "esp_at.h"
 }
+
+#if PLATFORM_ID == PLATFORM_ARGON
+#include "at_transport_uart.h"
+#elif PLATFORM_ID == PLATFORM_TRACKER
+#include "at_transport_sdio.h"
+#else
+#error "UNKOWN PLATFORM!"
+#endif
 
 extern "C" void app_main(void);
 

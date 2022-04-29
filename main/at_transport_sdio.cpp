@@ -44,6 +44,8 @@
 #include "logging.h"
 #include "util.h"
 
+#if PLATFORM_ID == PLATFORM_TRACKER
+
 namespace particle { namespace ncp {
 
 #define container_of(ptr, type, member) ({      \
@@ -388,3 +390,5 @@ void AtSdioTransport::txRun() {
 }
 
 } } /* particle::ncp */
+
+#endif // PLATFORM_ID == PLATFORM_TRACKER
